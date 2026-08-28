@@ -1,4 +1,4 @@
-const CACHE_NAME = "trainingsapp-v5";
+const CACHE_NAME = "trainingsapp-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -16,7 +16,12 @@ const APP_SHELL = [
   "./js/progress-view.js",
   "./js/ai-chat.js",
   "./js/chat-view.js",
+  "./js/rest-timer.js",
   "./icons/icon.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png",
+  "./icons/icon-180.png",
 ];
 
 self.addEventListener("install", (event) => {

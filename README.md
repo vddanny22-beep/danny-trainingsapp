@@ -2,10 +2,10 @@
 
 A phone-installable workout tracker that replaces the "Trainingsschema" Google Sheet
 for day-to-day use. Shows today's workout with a suggested weight per exercise
-(same auto-progression logic as the Sheet), lets you log sets/reps, lets you see
-your history and progress per exercise, lets you edit your own schema — no
-hardcoded plan — and includes an AI Coach chat scoped to sports/krachttraining,
-fitness and voeding.
+(same auto-progression logic as the Sheet), lets you log sets/reps with a rest
+timer between them, lets you see your history and progress per exercise, lets
+you edit your own schema — no hardcoded plan — and includes an AI Coach chat
+scoped to sports/krachttraining, fitness and voeding.
 
 Plain HTML/CSS/JS, no framework, no build step. Data lives on the phone
 (IndexedDB), so it works with no signal at the gym. Optionally backs up newly
@@ -43,8 +43,9 @@ it with its own icon, launching full-screen like a real app.
 
 ## What's in here
 
-- `index.html` — app shell, three views (Vandaag / Geschiedenis / Schema) toggled by JS
+- `index.html` — app shell, PWA/iOS meta tags, and the bottom tab bar; views are toggled by JS
 - `manifest.json` — PWA manifest (name, icons, standalone display)
+- `icons/` — `icon.svg` (rounded, for browsers) and `icon-maskable.svg` (full-bleed, for launcher masks) are the sources; the `.png` files are rendered from them. iOS ignores SVG for the home-screen icon, so `icon-180.png` is what it actually uses. To regenerate after editing a source SVG, render each SVG at 192/512/180px — any SVG-to-PNG tool works, as long as `icon.svg` keeps its transparent corners and the maskable/apple PNGs stay fully opaque.
 - `service-worker.js` — caches the app for offline use
 - `css/style.css` — mobile-first styling
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
@@ -52,6 +53,7 @@ it with its own icon, launching full-screen like a real app.
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises, plus the Sync-instellingen section
 - `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
+- `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab)
 - `js/history-view.js` — the Geschiedenis tab: past sessions + per-exercise progress (SVG sparklines)
 - `js/sheet-sync.js` — one-way sync (app → Sheet), calls the Apps Script Web App bridge
 - `js/ai-chat.js` — AI Coach: API key storage + the call to the Anthropic API
