@@ -1,4 +1,4 @@
-const CACHE_NAME = "trainingsapp-v6";
+const CACHE_NAME = "trainingsapp-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -17,6 +17,7 @@ const APP_SHELL = [
   "./js/ai-chat.js",
   "./js/chat-view.js",
   "./js/rest-timer.js",
+  "./js/backup.js",
   "./icons/icon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

@@ -11,6 +11,16 @@ Plain HTML/CSS/JS, no framework, no build step. Data lives on the phone
 (IndexedDB), so it works with no signal at the gym. Optionally backs up newly
 logged sessions to your Google Sheet with a manual "Sync nu" button.
 
+## Backing up your data
+
+Everything lives only on the phone, so Schema → Back-up is what protects it.
+"Back-up downloaden" writes one JSON file containing the schema, every logged
+session, body metrics and photos (photos travel as data URLs); "Back-up
+terugzetten" replaces all of that from such a file — which is also how you move
+to a new phone. The Sheet sync is not a substitute: it is one-way and covers
+sessions only. Restoring is destructive and asks for confirmation first, and a
+file that isn't one of this app's backups is refused rather than applied.
+
 ## Running it locally
 
 Service workers and ES modules require the page to be served over `http://` or
@@ -54,7 +64,8 @@ it with its own icon, launching full-screen like a real app.
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises, plus the Sync-instellingen section
 - `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
 - `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab)
-- `js/history-view.js` — the Geschiedenis tab: past sessions + per-exercise progress (SVG sparklines)
+- `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)
+- `js/backup.js` — full JSON backup/restore of schema, sessions, body metrics and photos
 - `js/sheet-sync.js` — one-way sync (app → Sheet), calls the Apps Script Web App bridge
 - `js/ai-chat.js` — AI Coach: API key storage + the call to the Anthropic API
 - `js/chat-view.js` — the AI Coach tab: chat UI, persists history to IndexedDB

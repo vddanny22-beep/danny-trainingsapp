@@ -1,6 +1,7 @@
 import * as storage from "./storage.js";
 import { getSyncUrl, setSyncUrl, syncNow } from "./sheet-sync.js";
 import { getRestSeconds, setRestSeconds, REST_PRESETS } from "./rest-timer.js";
+import { downloadBackup, restoreBackupFromFile } from "./backup.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -34,7 +35,77 @@ export async function renderSchemaEditor(container) {
   });
   container.appendChild(addDayBtn);
   container.appendChild(renderTrainingSettings());
+  container.appendChild(renderBackupSettings());
   container.appendChild(renderSyncSettings());
+}
+
+function renderBackupSettings() {
+  const section = document.createElement("section");
+  section.className = "sync-settings";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Back-up";
+  section.appendChild(heading);
+
+  const help = document.createElement("p");
+  help.className = "sync-help";
+  help.textContent = "Al je gegevens staan alleen op dit toestel. Maak een back-upbestand met je schema, sessies, metingen en foto's — bewaar dat ergens veilig, en zet het terug als je een nieuwe telefoon hebt.";
+  section.appendChild(help);
+
+  const status = document.createElement("p");
+  status.className = "sync-status";
+
+  const exportBtn = document.createElement("button");
+  exportBtn.type = "button";
+  exportBtn.className = "btn btn-secondary";
+  exportBtn.textContent = "Back-up downloaden";
+  exportBtn.addEventListener("click", async () => {
+    exportBtn.disabled = true;
+    status.textContent = "Back-up maken...";
+    status.classList.remove("warn");
+    const result = await downloadBackup();
+    status.textContent = result.message;
+    status.classList.toggle("warn", !result.ok);
+    exportBtn.disabled = false;
+  });
+  section.appendChild(exportBtn);
+
+  // Hidden input + its own button, so the restore can be confirmed before the
+  // file picker even opens.
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/json,.json";
+  fileInput.hidden = true;
+  section.appendChild(fileInput);
+
+  const importBtn = document.createElement("button");
+  importBtn.type = "button";
+  importBtn.className = "btn btn-secondary btn-danger";
+  importBtn.textContent = "Back-up terugzetten";
+  importBtn.addEventListener("click", () => {
+    if (!confirm("Terugzetten vervangt je huidige schema, sessies, metingen en foto's door die uit het back-upbestand. Doorgaan?")) return;
+    fileInput.click();
+  });
+  section.appendChild(importBtn);
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    importBtn.disabled = true;
+    status.textContent = "Terugzetten...";
+    status.classList.remove("warn");
+    const result = await restoreBackupFromFile(file);
+    status.textContent = result.message;
+    status.classList.toggle("warn", !result.ok);
+    importBtn.disabled = false;
+    fileInput.value = "";
+    // Every tab is now showing data that no longer exists; a reload is the
+    // simplest way to get the whole app onto the restored state at once.
+    if (result.ok) setTimeout(() => location.reload(), 1800);
+  });
+
+  section.appendChild(status);
+  return section;
 }
 
 function renderTrainingSettings() {
