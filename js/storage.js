@@ -1,8 +1,9 @@
 // IndexedDB wrapper. Object stores: "days" (schema), "sessions" (workout log),
-// "bodyLogs" (weight/waist/note) and "photos" (progress photo blobs).
+// "bodyLogs" (weight/waist/note), "photos" (progress photo blobs) and
+// "chatMessages" (AI coach conversation history).
 
 const DB_NAME = "trainingsapp";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise = null;
 
@@ -26,6 +27,9 @@ export function initDB() {
       }
       if (!db.objectStoreNames.contains("photos")) {
         db.createObjectStore("photos", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("chatMessages")) {
+        db.createObjectStore("chatMessages", { keyPath: "id" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -124,4 +128,23 @@ export async function savePhoto(entry) {
 export async function deletePhoto(id) {
   const store = await tx("photos", "readwrite");
   return requestToPromise(store.delete(id));
+}
+
+// AI coach chat history: { id, role ("user"/"assistant"), content, createdAt }.
+// Local-only — never synced to the Sheet, never sent anywhere except back to
+// the AI provider as conversation context for the next reply.
+export async function getChatMessages() {
+  const store = await tx("chatMessages", "readonly");
+  const messages = await requestToPromise(store.getAll());
+  return messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+
+export async function saveChatMessage(message) {
+  const store = await tx("chatMessages", "readwrite");
+  return requestToPromise(store.put(message));
+}
+
+export async function clearChatMessages() {
+  const store = await tx("chatMessages", "readwrite");
+  return requestToPromise(store.clear());
 }
