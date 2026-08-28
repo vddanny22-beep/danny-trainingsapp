@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { hitTopOfRange, isLegDay, suggestNextWeight } from "./progression.js";
+import { startRestTimer, stopRestTimer } from "./rest-timer.js";
 
 export async function renderTodayView(container) {
   const days = await storage.getDays();
@@ -72,6 +73,7 @@ async function renderForDay(container, days, selectedDayId) {
       return;
     }
     await storage.saveSession(session);
+    stopRestTimer(); // workout logged — no set left to rest between
     status.textContent = "Opgeslagen. Volgende keer suggereert de app het nieuwe gewicht.";
     saveBtn.disabled = true;
   });
@@ -117,6 +119,12 @@ async function renderExerciseBlock(exercise, day) {
     repsInput.type = "number";
     repsInput.placeholder = "reps";
     repsInput.className = "reps-input";
+    // Filling in reps means the set is done, so that's when the rest starts.
+    // "change" rather than "input": this fires once the field is committed,
+    // not on every keystroke, which would restart the timer mid-typing.
+    repsInput.addEventListener("change", () => {
+      if (repsInput.value.trim()) startRestTimer();
+    });
     setRow.appendChild(repsInput);
 
     block.appendChild(setRow);

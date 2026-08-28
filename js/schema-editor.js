@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { getSyncUrl, setSyncUrl, syncNow } from "./sheet-sync.js";
+import { getRestSeconds, setRestSeconds, REST_PRESETS } from "./rest-timer.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -32,7 +33,47 @@ export async function renderSchemaEditor(container) {
     renderSchemaEditor(container);
   });
   container.appendChild(addDayBtn);
+  container.appendChild(renderTrainingSettings());
   container.appendChild(renderSyncSettings());
+}
+
+function renderTrainingSettings() {
+  const section = document.createElement("section");
+  section.className = "sync-settings";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Trainingsinstellingen";
+  section.appendChild(heading);
+
+  const help = document.createElement("p");
+  help.className = "sync-help";
+  help.textContent = "Rusttijd tussen sets. De timer start automatisch zodra je de reps van een set invult.";
+  section.appendChild(help);
+
+  const picker = document.createElement("select");
+  picker.className = "day-picker";
+  const current = getRestSeconds();
+  REST_PRESETS.forEach((seconds) => {
+    const opt = document.createElement("option");
+    opt.value = seconds;
+    opt.textContent = seconds >= 60 && seconds % 60 === 0
+      ? `${seconds / 60} min`
+      : `${Math.floor(seconds / 60)} min ${seconds % 60} sec`;
+    if (seconds === current) opt.selected = true;
+    picker.appendChild(opt);
+  });
+
+  const status = document.createElement("p");
+  status.className = "sync-status";
+
+  picker.addEventListener("change", () => {
+    setRestSeconds(parseInt(picker.value, 10));
+    status.textContent = "Rusttijd opgeslagen.";
+  });
+
+  section.appendChild(picker);
+  section.appendChild(status);
+  return section;
 }
 
 function renderSyncSettings() {

@@ -8,6 +8,11 @@
   --accent: #a3e635;
   --accent-text: #1a2e05;
   --danger: #ff5c5c;
+  --nav-height: 58px;
+  /* Notch and home-indicator gutters. Zero on hardware without them, so the
+     same rules work in a desktop browser and on a phone. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * {
@@ -19,50 +24,150 @@ body {
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg-page);
   color: var(--text-primary);
+  /* Stops the page rubber-banding past its edges — that bounce is one of the
+     clearest "this is a website" tells once the app runs standalone. */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: var(--bg-card);
   color: var(--text-primary);
-  padding: 16px;
+  padding: 12px 16px;
+  /* The status bar is translucent in standalone mode, so the header has to
+     reserve its height itself or the title sits under the clock. */
+  padding-top: calc(12px + var(--safe-top));
   border-bottom: 1px solid var(--border);
 }
 
 .app-header h1 {
-  margin: 0 0 12px;
-  font-size: 20px;
+  margin: 0;
+  font-size: 18px;
   color: var(--accent);
   letter-spacing: -0.02em;
 }
 
 .app-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom);
 }
 
 .nav-btn {
-  flex: 1 1 28%;
-  padding: 10px 6px;
-  font-size: 13px;
-  font-weight: 600;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: var(--nav-height);
+  padding: 0 2px;
   border: none;
-  border-radius: 8px;
-  background: var(--bg-card-alt);
+  background: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .nav-btn.active {
-  background: var(--accent);
-  color: var(--accent-text);
+  color: var(--accent);
+}
+
+.nav-btn:active {
+  opacity: 0.55;
 }
 
 #content {
   padding: 16px;
   max-width: 640px;
   margin: 0 auto;
-  padding-bottom: 80px;
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px);
+}
+
+/* Rusttimer tussen sets */
+
+.rest-timer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-height) + var(--safe-bottom));
+  z-index: 15;
+  background: var(--bg-card-alt);
+  border-top: 1px solid var(--border);
+}
+
+.rest-timer[hidden] {
+  display: none;
+}
+
+.rest-timer-progress {
+  height: 3px;
+  background: var(--border);
+}
+
+.rest-timer-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+
+.rest-timer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 10px 16px;
+}
+
+.rest-timer-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rest-timer-time {
+  flex: 1;
+  font-size: 22px;
+  font-weight: 700;
+  /* Equal-width digits stop the countdown jittering as numbers change. */
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.rest-timer.done .rest-timer-time {
+  color: var(--accent);
+}
+
+.rest-timer-btn {
+  margin-left: 0;
+}
+
+/* Keeps the last card clear of the timer bar while it's showing. */
+body.rest-timer-open #content {
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 92px);
 }
 
 h2 {
