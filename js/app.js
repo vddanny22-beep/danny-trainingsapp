@@ -1,0 +1,48 @@
+import * as storage from "./storage.js";
+import { getSeedDays } from "./seed.js";
+import { renderTodayView } from "./today-view.js";
+import { renderSchemaEditor } from "./schema-editor.js";
+
+const content = document.getElementById("content");
+const navToday = document.getElementById("nav-today");
+const navSchema = document.getElementById("nav-schema");
+
+async function seedIfEmpty() {
+  const days = await storage.getDays();
+  if (days.length) return;
+  for (const day of getSeedDays()) {
+    await storage.saveDay(day);
+  }
+}
+
+function setActiveNav(button) {
+  [navToday, navSchema].forEach((b) => b.classList.remove("active"));
+  button.classList.add("active");
+}
+
+async function showToday() {
+  setActiveNav(navToday);
+  await renderTodayView(content);
+}
+
+async function showSchema() {
+  setActiveNav(navSchema);
+  await renderSchemaEditor(content);
+}
+
+navToday.addEventListener("click", showToday);
+navSchema.addEventListener("click", showSchema);
+
+async function init() {
+  await storage.initDB();
+  await seedIfEmpty();
+  await showToday();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js").catch((err) => {
+      console.warn("Service worker registration failed:", err);
+    });
+  }
+}
+
+init();

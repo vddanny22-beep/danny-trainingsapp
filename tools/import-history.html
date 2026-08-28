@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Trainingsschema — geschiedenis importeren</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    button { padding: 12px 20px; font-size: 16px; cursor: pointer; }
+    pre { background: #f4f4f6; padding: 12px; border-radius: 8px; white-space: pre-wrap; }
+    .warn { color: #cc0000; }
+    .ok { color: #16a765; }
+  </style>
+</head>
+<body>
+  <h1>Eenmalige import: trainingsgeschiedenis</h1>
+  <p>
+    Dit is een los hulpmiddel, geen onderdeel van de app zelf — de app blijft leeg voor
+    nieuwe gebruikers. Dit importeert Danny's geschiedenis uit de "Trainingslog" Google
+    Sheet-tab (10 sessies, 9-27 augustus 2026) rechtstreeks in de lokale opslag van de
+    app <strong>in deze browser</strong>. Open dit bestand dus op hetzelfde toestel/dezelfde
+    browser waar je de app ook echt gebruikt.
+  </p>
+  <p>
+    Draai dit maar één keer. Nog een keer draaien maakt dubbele sessies aan.
+  </p>
+  <button id="run">Importeer geschiedenis</button>
+  <pre id="log"></pre>
+
+  <script type="module">
+    import * as storage from "../js/storage.js";
+
+    // Extracted from the "Trainingslog" tab. Week 1/2 sessions had no recorded
+    // date in the sheet — dates below are estimated backward from Week 3's real
+    // dates, spaced ~2 days apart, purely to preserve chronological order.
+    // Week 3 onward uses the sheet's actual logged dates.
+    const HISTORY = [
+      {
+        date: "2026-08-09", dayName: "Maandag – Push",
+        exercises: {
+          "Chest Press": [[39,10],[39,10],[39,10],[39,9]],
+          "Shoulder Press": [[18,10],[18,10],[18,10],[18,8]],
+          "Pec Fly": [[32,10],[32,10],[32,10],[32,10]],
+          "Cable Lateral Raise": [[4.5,8],[4.5,10],[4.5,10],[4.5,9]],
+          "Triceps Pushdown": [[27,10],[27,10],[27,10],[27,10]],
+          "Bar Pushdown": [[18,10],[18,10],[18,10],[18,10]],
+        },
+      },
+      {
+        date: "2026-08-11", dayName: "Dinsdag – Pull",
+        exercises: {
+          "Lat Pulldown": [[32,10],[36,10],[36,10],[36,10]],
+          "Seated Row": [[45,10],[45,10],[45,9],[45,10]],
+          "Chest Supported Row": [[32,10],[39,10],[39,10],[39,10]],
+          "Rear Delt": [[25,10],[32,10],[32,10],[32,10]],
+          "Biceps Curl": [[14,10],[23,10],[23,10],[23,10]],
+          "Cable Hammer Curl": [[18,9],[15.8,10],[15.8,10],[15.8,10]],
+        },
+      },
+      {
+        date: "2026-08-13", dayName: "Woensdag – Legs",
+        exercises: {
+          "Hack Squat": [[40,10],[40,10],[40,10],[40,10]],
+          "Leg Extension": [[32,10],[32,10],[32,10],[32,10]],
+          "Leg Curl": [[32,10],[32,10],[32,10],[32,10]],
+          // Triceps Pull (Cable), Cable Biceps Curl and an extra Lat Pulldown
+          // Machine were also logged this day in the sheet, but don't match
+          // any exercise in the current schema — skipped rather than guessed.
+        },
+      },
+      {
+        date: "2026-08-17", dayName: "Maandag – Push",
+        exercises: {
+          "Chest Press": [[41.5,10],[41.5,10],[41.5,8],[41.5,6]],
+          "Shoulder Press": [[20.3,10],[20.3,10],[20.3,10],[20.3,10]],
+          "Pec Fly": [[32,10],[32,10],[32,10],[32,10]],
+          "Cable Lateral Raise": [[4.5,10],[4.5,10],[4.5,10],[4.5,10]],
+          "Triceps Pushdown": [[27,10],[27,10],[27,10],[27,10]],
+          "Bar Pushdown": [[20.3,10],[20.3,10],[20.3,10],[20.3,10]],
+        },
+      },
+      {
+        date: "2026-08-19", dayName: "Dinsdag – Pull",
+        exercises: {
+          "Lat Pulldown": [[36,10],[36,10],[36,10],[36,10]],
+          "Seated Row": [[45,10],[45,10],[45,10],[45,10]],
+          "Chest Supported Row": [[42,10],[42,10],[42,10],[42,10]],
+          "Rear Delt": [[35,10],[35,10],[35,10],[35,10]],
+          "Biceps Curl": [[23,10],[23,10],[23,10],[23,10]],
+          "Cable Hammer Curl": [[17.5,10],[17.5,10],[17.5,10],[17.5,10]],
+        },
+      },
+      {
+        date: "2026-08-21", dayName: "Woensdag – Legs",
+        exercises: {
+          "Hack Squat": [[45,10],[45,10],[45,10],[45,10]],
+          "Leg Extension": [[35,10],[35,10],[35,10],[35,10]],
+          "Leg Curl": [[35,10],[35,10],[35,10],[35,10]],
+        },
+      },
+      {
+        date: "2026-08-23", dayName: "Maandag – Push",
+        exercises: {
+          "Chest Press": [[41.5,10],[41.5,10],[41.5,10],[41.5,10]],
+          "Shoulder Press": [[23,10],[23,10],[23,10],[23,10]],
+          "Pec Fly": [[39,10],[39,10],[39,10],[39,10]],
+          "Cable Lateral Raise": [[4.5,10],[4.5,10],[4.5,10],[4.5,10]],
+          "Triceps Pushdown": [[29.3,10],[29.3,10],[29.3,10],[29.3,10]],
+          "Bar Pushdown": [[20.3,10],[20.3,10],[20.3,10],[20.3,10]],
+        },
+      },
+      {
+        date: "2026-08-24", dayName: "Dinsdag – Pull",
+        exercises: {
+          "Lat Pulldown": [[39,10],[39,10],[39,10],[39,10]],
+          "Seated Row": [[45,10],[45,10],[45,10],[45,10]],
+          "Chest Supported Row": [[45,10],[45,10],[45,10],[45,10]],
+          "Rear Delt": [[39,10],[39,10],[39,10],[39,10]],
+          "Biceps Curl": [[25.2,10],[25.2,10],[25.2,10],[25.2,10]],
+          "Cable Hammer Curl": [[18,10],[18,10],[18,10],[18,10]],
+        },
+      },
+      {
+        date: "2026-08-25", dayName: "Woensdag – Legs",
+        exercises: {
+          "Hack Squat": [[52,10],[52,10],[52,10],[52,10]],
+          "Leg Extension": [[36.6,10],[36.6,10],[36.6,10],[36.6,10]],
+          "Leg Curl": [[36.6,10],[36.6,10],[36.6,10],[36.6,10]],
+          "Calf Raise": [[40,10],[40,10],[40,10],[40,10]],
+        },
+      },
+      {
+        date: "2026-08-27", dayName: "Donderdag – Push",
+        exercises: {
+          "Chest Press": [[42.4,10],[42.4,10],[42.4,6],[42.4,7]],
+          "Shoulder Press": [[25.3,10],[25.3,10],[25.3,10],[25.3,10]],
+          "Pec Fly": [[45,10],[45,10],[45,10],[45,10]],
+          "Cable Lateral Raise": [[6.8,10],[6.8,10],[6.8,10],[6.8,8]],
+          "Triceps Pushdown": [[32,10],[32,10],[32,10],[32,10]],
+          "Bar Pushdown": [[22.5,10],[22.5,9],[22.5,8],[22.5,8]],
+        },
+      },
+    ];
+
+    const logEl = document.getElementById("log");
+    function log(line, cls) {
+      const span = document.createElement("div");
+      if (cls) span.className = cls;
+      span.textContent = line;
+      logEl.appendChild(span);
+    }
+
+    document.getElementById("run").addEventListener("click", async () => {
+      logEl.innerHTML = "";
+      await storage.initDB();
+      const days = await storage.getDays();
+
+      let imported = 0;
+      let skipped = 0;
+
+      for (const session of HISTORY) {
+        const day = days.find((d) => d.name === session.dayName);
+        if (!day) {
+          log(`Dag "${session.dayName}" niet gevonden in huidig schema — sessie van ${session.date} overgeslagen.`, "warn");
+          skipped++;
+          continue;
+        }
+
+        const entries = [];
+        for (const [exerciseName, sets] of Object.entries(session.exercises)) {
+          const exercise = day.exercises.find((e) => e.name === exerciseName);
+          if (!exercise) {
+            log(`"${exerciseName}" niet gevonden in "${session.dayName}" — overgeslagen (${session.date}).`, "warn");
+            continue;
+          }
+          entries.push({
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+            sets: sets.map(([weight, reps]) => ({ weight, reps })),
+          });
+        }
+
+        if (!entries.length) {
+          log(`Geen bruikbare oefeningen voor sessie ${session.date} — overgeslagen.`, "warn");
+          skipped++;
+          continue;
+        }
+
+        await storage.saveSession({
+          id: crypto.randomUUID(),
+          date: new Date(session.date + "T12:00:00").toISOString(),
+          dayId: day.id,
+          dayName: day.name,
+          entries,
+        });
+        log(`${session.date} — ${session.dayName}: geïmporteerd (${entries.length} oefeningen).`, "ok");
+        imported++;
+      }
+
+      log(`\nKlaar. ${imported} sessies geïmporteerd, ${skipped} overgeslagen.`, "ok");
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+:root {
+  --red: #cc0000;
+  --blue: #1c4587;
+  --bg: #f4f4f6;
+  --white: #ffffff;
+  --text: #111318;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --danger: #cc0000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-header {
+  background: var(--blue);
+  color: white;
+  padding: 16px;
+}
+
+.app-header h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.app-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  cursor: pointer;
+}
+
+.nav-btn.active {
+  background: white;
+  color: var(--blue);
+}
+
+#content {
+  padding: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding-bottom: 80px;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.day-picker {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.exercise-block {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.exercise-block legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.suggested-weight {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 4px 0 12px;
+}
+
+.set-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.set-row input {
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  width: 100%;
+}
+
+.btn {
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: white;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.btn-secondary {
+  background: var(--white);
+  color: var(--blue);
+  border: 1px solid var(--blue);
+  width: 100%;
+  margin-top: 8px;
+}
+
+.btn-small {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  margin-left: 6px;
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.save-status {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.day-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.day-card-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.day-card-header h3 {
+  flex: 1;
+  margin: 0;
+}
+
+.exercise-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.exercise-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 4px;
+}
