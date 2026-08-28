@@ -331,6 +331,28 @@ h2 {
   color: var(--text-primary);
 }
 
+.session-item-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.session-item-header .session-summary {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.session-editor {
+  margin-top: 10px;
+}
+
+/* Sits on an already-carded session, so it needs the lighter fill to read as
+   a nested block rather than blending into the card behind it. */
+.session-editor .exercise-block {
+  background: var(--bg-card-alt);
+}
+
 .session-details {
   list-style: none;
   padding: 0;

@@ -21,10 +21,10 @@ export async function renderHistoryView(container) {
   }
 
   container.appendChild(renderProgressSection(sessions));
-  container.appendChild(renderSessionList(sessions));
+  container.appendChild(renderSessionList(sessions, container));
 }
 
-function renderSessionList(sessions) {
+function renderSessionList(sessions, container) {
   const section = document.createElement("section");
   const heading = document.createElement("h3");
   heading.textContent = "Sessies";
@@ -32,35 +32,160 @@ function renderSessionList(sessions) {
 
   const list = document.createElement("ul");
   list.className = "session-list";
-  sessions.forEach((session) => {
-    const item = document.createElement("li");
-    item.className = "session-item";
-
-    const dateLabel = new Date(session.date).toLocaleDateString("nl-NL", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-
-    const summary = document.createElement("div");
-    summary.className = "session-summary";
-    summary.textContent = `${dateLabel} — ${session.dayName} (${session.entries.length} oefeningen)`;
-    item.appendChild(summary);
-
-    const details = document.createElement("ul");
-    details.className = "session-details";
-    session.entries.forEach((entry) => {
-      const detail = document.createElement("li");
-      const setsText = entry.sets.map((s) => `${s.weight}kg×${s.reps}`).join(", ");
-      detail.textContent = `${entry.exerciseName}: ${setsText}`;
-      details.appendChild(detail);
-    });
-    item.appendChild(details);
-
-    list.appendChild(item);
-  });
+  sessions.forEach((session) => list.appendChild(renderSessionItem(session, container)));
   section.appendChild(list);
   return section;
+}
+
+function formatSessionDate(session) {
+  return new Date(session.date).toLocaleDateString("nl-NL", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function renderSessionItem(session, container) {
+  const item = document.createElement("li");
+  item.className = "session-item";
+
+  const header = document.createElement("div");
+  header.className = "session-item-header";
+
+  const summary = document.createElement("div");
+  summary.className = "session-summary";
+  summary.textContent = `${formatSessionDate(session)} — ${session.dayName} (${session.entries.length} oefeningen)`;
+  header.appendChild(summary);
+
+  const editBtn = smallButton("Bewerken", () => {
+    body.replaceWith(renderSessionEditor(session, container));
+    editBtn.disabled = true;
+  });
+  header.appendChild(editBtn);
+
+  const deleteBtn = smallButton("Verwijderen", async () => {
+    if (!confirm(`Sessie van ${formatSessionDate(session)} (${session.dayName}) verwijderen?`)) return;
+    await storage.deleteSession(session.id);
+    renderHistoryView(container);
+  });
+  deleteBtn.classList.add("btn-danger");
+  header.appendChild(deleteBtn);
+
+  item.appendChild(header);
+
+  const body = renderSessionDetails(session);
+  item.appendChild(body);
+
+  return item;
+}
+
+function renderSessionDetails(session) {
+  const details = document.createElement("ul");
+  details.className = "session-details";
+  session.entries.forEach((entry) => {
+    const detail = document.createElement("li");
+    const setsText = entry.sets.map((s) => `${s.weight}kg×${s.reps}`).join(", ");
+    detail.textContent = `${entry.exerciseName}: ${setsText}`;
+    details.appendChild(detail);
+  });
+  return details;
+}
+
+// Inline editor for one logged session. Correcting a mistyped weight matters
+// beyond the history list: today-view suggests the next weight from the most
+// recent entry for that exercise, so a stray "500" would otherwise skew every
+// future suggestion.
+function renderSessionEditor(session, container) {
+  const form = document.createElement("form");
+  form.className = "session-editor";
+
+  session.entries.forEach((entry, entryIndex) => {
+    const block = document.createElement("fieldset");
+    block.className = "exercise-block";
+    block.dataset.entryIndex = entryIndex;
+
+    const legend = document.createElement("legend");
+    legend.textContent = entry.exerciseName;
+    block.appendChild(legend);
+
+    entry.sets.forEach((set, setIndex) => {
+      const row = document.createElement("div");
+      row.className = "set-row";
+
+      const label = document.createElement("span");
+      label.textContent = `Set ${setIndex + 1}`;
+      row.appendChild(label);
+
+      const weightInput = document.createElement("input");
+      weightInput.type = "number";
+      weightInput.step = "0.5";
+      weightInput.className = "weight-input";
+      weightInput.value = set.weight;
+      row.appendChild(weightInput);
+
+      const repsInput = document.createElement("input");
+      repsInput.type = "number";
+      repsInput.className = "reps-input";
+      repsInput.value = set.reps;
+      row.appendChild(repsInput);
+
+      block.appendChild(row);
+    });
+
+    form.appendChild(block);
+  });
+
+  const status = document.createElement("p");
+  status.className = "save-status";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.className = "btn btn-primary";
+  saveBtn.textContent = "Wijzigingen opslaan";
+  form.appendChild(saveBtn);
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn btn-secondary";
+  cancelBtn.textContent = "Annuleren";
+  cancelBtn.addEventListener("click", () => renderHistoryView(container));
+  form.appendChild(cancelBtn);
+
+  form.appendChild(status);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const entries = [];
+    form.querySelectorAll(".exercise-block").forEach((block) => {
+      const original = session.entries[Number(block.dataset.entryIndex)];
+      const sets = [];
+      block.querySelectorAll(".set-row").forEach((row) => {
+        const weight = parseFloat(row.querySelector(".weight-input").value);
+        const reps = parseInt(row.querySelector(".reps-input").value, 10);
+        if (!Number.isNaN(weight) && !Number.isNaN(reps)) sets.push({ weight, reps });
+      });
+      if (sets.length) entries.push({ ...original, sets });
+    });
+
+    if (!entries.length) {
+      status.textContent = "Er blijft geen enkele set over. Gebruik \"Verwijderen\" als je de hele sessie wilt wissen.";
+      return;
+    }
+
+    await storage.saveSession({ ...session, entries });
+    renderHistoryView(container);
+  });
+
+  return form;
+}
+
+function smallButton(text, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-small";
+  btn.textContent = text;
+  btn.addEventListener("click", onClick);
+  return btn;
 }
 
 function renderProgressSection(sessions) {

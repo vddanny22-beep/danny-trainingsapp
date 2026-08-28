@@ -76,6 +76,11 @@ export async function saveSession(session) {
   return requestToPromise(store.put(session));
 }
 
+export async function deleteSession(id) {
+  const store = await tx("sessions", "readwrite");
+  return requestToPromise(store.delete(id));
+}
+
 export async function getLastSession() {
   const sessions = await getSessions();
   return sessions.length ? sessions[0] : null;
@@ -147,4 +152,29 @@ export async function saveChatMessage(message) {
 export async function clearChatMessages() {
   const store = await tx("chatMessages", "readwrite");
   return requestToPromise(store.clear());
+}
+
+// Wipes and rewrites every data store in ONE transaction, so a restore either
+// lands completely or not at all — a half-written database would leave the
+// user with neither their old data nor their backup. Chat history is
+// deliberately left alone: it isn't part of a backup.
+export async function replaceAllData({ days, sessions, bodyLogs, photos }) {
+  const db = await initDB();
+  const storeNames = ["days", "sessions", "bodyLogs", "photos"];
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeNames, "readwrite");
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+
+    const rewrite = (name, items) => {
+      const store = transaction.objectStore(name);
+      store.clear();
+      (items || []).forEach((item) => store.put(item));
+    };
+    rewrite("days", days);
+    rewrite("sessions", sessions);
+    rewrite("bodyLogs", bodyLogs);
+    rewrite("photos", photos);
+  });
 }
