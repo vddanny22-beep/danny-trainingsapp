@@ -1,6 +1,9 @@
 import * as storage from "./storage.js";
 import { getSyncUrl, setSyncUrl, syncNow } from "./sheet-sync.js";
-import { getRestSeconds, setRestSeconds, REST_PRESETS } from "./rest-timer.js";
+import {
+  getRestSeconds, setRestSeconds, REST_PRESETS,
+  notificationsSupported, notificationsEnabled, notificationsBlocked, requestNotificationPermission,
+} from "./rest-timer.js";
 import { downloadBackup, restoreBackupFromFile } from "./backup.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
@@ -148,7 +151,59 @@ function renderTrainingSettings() {
 
   section.appendChild(picker);
   section.appendChild(status);
+  section.appendChild(renderNotificationSetting());
   return section;
+}
+
+// Opt-in, because a permission prompt fired unannounced mid-workout is the
+// kind of thing people deny once and then can't easily undo.
+function renderNotificationSetting() {
+  const wrap = document.createElement("div");
+  wrap.className = "notification-setting";
+
+  const help = document.createElement("p");
+  help.className = "sync-help";
+  wrap.appendChild(help);
+
+  if (!notificationsSupported()) {
+    help.textContent = "Meldingen worden niet ondersteund door deze browser. Het scherm blijft tijdens het rusten wel aan, zodat je de piep hoort.";
+    return wrap;
+  }
+
+  const status = document.createElement("p");
+  status.className = "sync-status";
+
+  const enableBtn = document.createElement("button");
+  enableBtn.type = "button";
+  enableBtn.className = "btn btn-small";
+  enableBtn.textContent = "Meldingen aanzetten";
+  enableBtn.addEventListener("click", async () => {
+    enableBtn.disabled = true;
+    const result = await requestNotificationPermission();
+    refresh();
+    if (result === "denied") {
+      status.textContent = "Meldingen geweigerd. Je kunt dit aanzetten via de site-instellingen van je browser.";
+      status.classList.add("warn");
+    }
+  });
+  wrap.appendChild(enableBtn);
+  wrap.appendChild(status);
+
+  function refresh() {
+    const enabled = notificationsEnabled();
+    const blocked = notificationsBlocked();
+    help.textContent = enabled
+      ? "Je krijgt een melding zodra je rust erop zit, ook als je de app even weglegt. Tijdens het rusten blijft het scherm aan."
+      : "Zet meldingen aan om een seintje te krijgen als je rust erop zit, ook als je de app even weglegt.";
+    enableBtn.hidden = enabled || blocked;
+    if (blocked && !status.textContent) {
+      status.textContent = "Meldingen staan geblokkeerd in je browser-instellingen.";
+      status.classList.add("warn");
+    }
+  }
+
+  refresh();
+  return wrap;
 }
 
 function renderSyncSettings() {

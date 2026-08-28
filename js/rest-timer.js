@@ -18,10 +18,87 @@ export function setRestSeconds(seconds) {
   localStorage.setItem(DURATION_KEY, String(seconds));
 }
 
+export function notificationsEnabled() {
+  return "Notification" in window && Notification.permission === "granted";
+}
+
+export function notificationsBlocked() {
+  return "Notification" in window && Notification.permission === "denied";
+}
+
+export function notificationsSupported() {
+  return "Notification" in window;
+}
+
+export async function requestNotificationPermission() {
+  if (!notificationsSupported()) return "unsupported";
+  try {
+    return await Notification.requestPermission();
+  } catch {
+    return "denied";
+  }
+}
+
+// Shown through the service worker registration where possible: a page-created
+// Notification is tied to the page, and the page is exactly what the phone
+// suspends when the screen goes off — which is when this alert matters most.
+async function showRestDoneNotification() {
+  if (!notificationsEnabled()) return;
+  const options = {
+    body: "Je rust zit erop — tijd voor de volgende set.",
+    tag: "rest-timer", // replaces a previous one instead of stacking
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+  };
+  try {
+    const registration = await navigator.serviceWorker?.ready;
+    if (registration) {
+      await registration.showNotification("Rust voorbij", options);
+      return;
+    }
+  } catch {
+    // fall through to the page-level notification below
+  }
+  try {
+    new Notification("Rust voorbij", options);
+  } catch {
+    // Notifications unavailable — the chime and vibration still cover it.
+  }
+}
+
 let barEl = null;
 let timeEl = null;
 let fillEl = null;
 let intervalId = null;
+// Screen wake lock held for the duration of a rest. Without it the phone
+// sleeps between sets, the page is suspended, and the chime at zero never
+// fires — the one thing a native app would genuinely do better here.
+let wakeLock = null;
+
+async function acquireWakeLock() {
+  if (!("wakeLock" in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    // The browser drops the lock whenever the page is hidden; clearing our
+    // handle here keeps re-acquisition (below) from thinking it still holds one.
+    wakeLock.addEventListener("release", () => {
+      wakeLock = null;
+    });
+  } catch {
+    wakeLock = null; // denied, unsupported, or not allowed right now
+  }
+}
+
+function releaseWakeLock() {
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+}
+
+// Coming back to the app mid-rest has to re-take the lock the browser dropped
+// when the page went away.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && intervalId !== null) acquireWakeLock();
+});
 // Wall-clock deadline rather than a tick count: setInterval is throttled in
 // background tabs and drifts, and the phone screen is usually off while
 // resting — comparing against Date.now() stays correct through all of that.
@@ -78,6 +155,7 @@ function ensureBar() {
     if (finished) {
       barEl.classList.remove("done");
       intervalId = setInterval(tick, 250);
+      acquireWakeLock(); // released when the timer hit zero
     }
     tick();
   });
@@ -133,6 +211,8 @@ function tick() {
   timeEl.textContent = "Klaar!";
   playChime();
   navigator.vibrate?.([200, 100, 200]);
+  showRestDoneNotification();
+  releaseWakeLock();
 }
 
 export function startRestTimer(seconds = getRestSeconds()) {
@@ -157,11 +237,13 @@ export function startRestTimer(seconds = getRestSeconds()) {
   clearInterval(intervalId);
   tick();
   intervalId = setInterval(tick, 250);
+  acquireWakeLock();
 }
 
 export function stopRestTimer() {
   clearInterval(intervalId);
   intervalId = null;
+  releaseWakeLock();
   if (barEl) {
     barEl.hidden = true;
     barEl.classList.remove("done");
