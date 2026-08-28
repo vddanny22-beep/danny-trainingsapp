@@ -64,7 +64,7 @@ it with its own icon, launching full-screen like a real app.
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
 - `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
-- `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab)
+- `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab). Holds a screen wake lock while resting and fires a notification at zero, so locking the phone mid-set doesn't swallow the alert
 - `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)
 - `js/backup.js` — full JSON backup/restore of schema, sessions, body metrics and photos
 - `js/sheet-sync.js` — one-way sync (app → Sheet), calls the Apps Script Web App bridge
@@ -99,10 +99,27 @@ it's a personal, single-user app:
 The coach stays on-topic (fitness/training/voeding) and refuses medical
 diagnoses, deferring injury questions to a doctor or physio instead.
 
-## What's next (not built yet)
+## Why there's no Android APK (Phase 3, deliberately not done)
 
-- **Phase 3:** wrap with [Capacitor](https://capacitorjs.com/) to produce a real
-  installable/publishable Android `.apk`, then Play Store prep
+Earlier plans had wrapping this in [Capacitor](https://capacitorjs.com/) to ship
+a real `.apk`. That is on hold on purpose, not forgotten.
+
+For a single user who already installs the PWA to the home screen, an APK adds
+almost nothing: the icon, the full-screen launch and the offline cache are
+already there. What it *does* add is a build step, `node_modules` and an
+`android/` tree in a repo whose whole premise is "no framework, no build step" —
+and which doubles as the GitHub Pages deploy source. Building it would also mean
+installing Android Studio and the SDK locally.
+
+The one thing a native wrapper would genuinely do better was the rest timer:
+lock the phone mid-set and the browser suspends the page, so the chime at zero
+never fires. That is now handled directly — a screen wake lock for the duration
+of the rest, plus a notification through the service worker — which is most of
+the benefit for none of the machinery.
+
+Revisit Capacitor if one of these becomes true: you want it in the Play Store,
+you want it usable by people other than yourself, or you need a native API the
+web platform can't reach (true background scheduling, health-app integration).
 
 See `plans/explore-2026-08-28-trainingsapp.md` in the workspace root for the full
 roadmap and reasoning behind these choices.
