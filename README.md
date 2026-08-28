@@ -70,9 +70,11 @@ it with its own icon, launching full-screen like a real app.
 ## Setting up the AI Coach (optional)
 
 The AI Coach tab answers questions about krachttraining, sporten, voeding en
-herstel, grounded in your own schema. It calls the Anthropic API directly from
-the browser — there's no backend, so this only works because it's a personal,
-single-user app:
+herstel, grounded in your own schema, your last 5 logged sessions and your
+last 5 body-metric entries (so it can spot stagnation, judge progression, or
+tune nutrition advice to your training volume). It calls the Anthropic API
+directly from the browser — there's no backend, so this only works because
+it's a personal, single-user app:
 
 1. Get an API key at [console.anthropic.com](https://console.anthropic.com/) (this uses paid API credits, not a Claude.ai subscription).
 2. Open the AI Coach tab → paste the key under "AI Coach-instellingen" → Opslaan.
