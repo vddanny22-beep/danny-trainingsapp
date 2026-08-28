@@ -91,11 +91,13 @@ export async function getLastSession() {
 // id per day in the schema (Monday's Push day and Thursday's Push day each have
 // their own exercise objects), but progression should carry across both, same as
 // it did in the Sheet.
+// Returns { date, entry } — the date so the Vandaag tab can say *when* you
+// last did this exercise, not just what you lifted.
 export async function getLastEntryForExerciseName(exerciseName) {
   const sessions = await getSessions();
   for (const session of sessions) {
     const entry = session.entries.find((e) => e.exerciseName === exerciseName);
-    if (entry) return entry;
+    if (entry) return { date: session.date, entry };
   }
   return null;
 }

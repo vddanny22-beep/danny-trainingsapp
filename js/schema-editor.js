@@ -19,7 +19,7 @@ export async function renderSchemaEditor(container) {
 
   const list = document.createElement("div");
   list.className = "day-list";
-  days.forEach((day) => list.appendChild(renderDayCard(day, container)));
+  days.forEach((day, index) => list.appendChild(renderDayCard(day, container, days, index)));
   container.appendChild(list);
 
   const addDayBtn = document.createElement("button");
@@ -33,7 +33,10 @@ export async function renderSchemaEditor(container) {
         await storage.saveDay({
           id: crypto.randomUUID(),
           name,
-          order: days.length,
+          // One past the highest existing order rather than days.length:
+          // deleting a day leaves a gap, and counting would hand the new day
+          // an order another day already holds.
+          order: days.length ? Math.max(...days.map((d) => d.order)) + 1 : 0,
           exercises: [],
         });
         renderSchemaEditor(container);
@@ -252,7 +255,43 @@ function renderSyncSettings() {
   return section;
 }
 
-function renderDayCard(day, rootContainer) {
+// Moves the item at `from` to `to` and renumbers every day's order from
+// scratch. Renumbering rather than swapping two order values: a deleted day
+// can leave two days holding the same order, and swapping equal values is a
+// silent no-op.
+async function moveDay(days, from, to, rootContainer) {
+  if (to < 0 || to >= days.length) return;
+  const reordered = [...days];
+  const [moved] = reordered.splice(from, 1);
+  reordered.splice(to, 0, moved);
+  for (let i = 0; i < reordered.length; i++) {
+    if (reordered[i].order !== i) await storage.saveDay({ ...reordered[i], order: i });
+  }
+  renderSchemaEditor(rootContainer);
+}
+
+async function moveExercise(day, from, to, rootContainer) {
+  if (to < 0 || to >= day.exercises.length) return;
+  const exercises = [...day.exercises];
+  const [moved] = exercises.splice(from, 1);
+  exercises.splice(to, 0, moved);
+  await storage.saveDay({ ...day, exercises });
+  renderSchemaEditor(rootContainer);
+}
+
+// Arrow-only button, so it needs a spoken label of its own.
+function moveButton(direction, disabled, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-small btn-move";
+  btn.textContent = direction === "up" ? "↑" : "↓";
+  btn.setAttribute("aria-label", direction === "up" ? "Omhoog verplaatsen" : "Omlaag verplaatsen");
+  btn.disabled = disabled;
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
+function renderDayCard(day, rootContainer, days, index) {
   const card = document.createElement("div");
   card.className = "day-card";
 
@@ -262,6 +301,11 @@ function renderDayCard(day, rootContainer) {
   const title = document.createElement("h3");
   title.textContent = day.name;
   header.appendChild(title);
+
+  const actions = document.createElement("div");
+  actions.className = "row-actions";
+  actions.appendChild(moveButton("up", index === 0, () => moveDay(days, index, index - 1, rootContainer)));
+  actions.appendChild(moveButton("down", index === days.length - 1, () => moveDay(days, index, index + 1, rootContainer)));
 
   const renameBtn = smallButton("Naam wijzigen", () => {
     header.replaceWith(renderDayNameForm({
@@ -274,7 +318,7 @@ function renderDayCard(day, rootContainer) {
       },
     }));
   });
-  header.appendChild(renameBtn);
+  actions.appendChild(renameBtn);
 
   const deleteDayBtn = smallButton("Dag verwijderen", async () => {
     if (!confirm(`"${day.name}" verwijderen, inclusief alle oefeningen?`)) return;
@@ -282,13 +326,16 @@ function renderDayCard(day, rootContainer) {
     renderSchemaEditor(rootContainer);
   });
   deleteDayBtn.classList.add("btn-danger");
-  header.appendChild(deleteDayBtn);
+  actions.appendChild(deleteDayBtn);
 
+  header.appendChild(actions);
   card.appendChild(header);
 
   const exerciseList = document.createElement("ul");
   exerciseList.className = "exercise-list";
-  day.exercises.forEach((ex) => exerciseList.appendChild(renderExerciseRow(day, ex, rootContainer)));
+  day.exercises.forEach((ex, exIndex) =>
+    exerciseList.appendChild(renderExerciseRow(day, ex, rootContainer, exIndex))
+  );
   card.appendChild(exerciseList);
 
   const addExerciseBtn = smallButton("+ Oefening toevoegen", () => {
@@ -309,13 +356,18 @@ function renderDayCard(day, rootContainer) {
   return card;
 }
 
-function renderExerciseRow(day, exercise, rootContainer) {
+function renderExerciseRow(day, exercise, rootContainer, index) {
   const row = document.createElement("li");
   row.className = "exercise-row";
 
   const label = document.createElement("span");
   label.textContent = `${exercise.name} — ${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps`;
   row.appendChild(label);
+
+  const actions = document.createElement("div");
+  actions.className = "row-actions";
+  actions.appendChild(moveButton("up", index === 0, () => moveExercise(day, index, index - 1, rootContainer)));
+  actions.appendChild(moveButton("down", index === day.exercises.length - 1, () => moveExercise(day, index, index + 1, rootContainer)));
 
   const editBtn = smallButton("Bewerken", () => {
     // Replaces the row's contents rather than the <li> itself, so the form
@@ -335,7 +387,7 @@ function renderExerciseRow(day, exercise, rootContainer) {
       },
     }));
   });
-  row.appendChild(editBtn);
+  actions.appendChild(editBtn);
 
   const deleteBtn = smallButton("Verwijderen", async () => {
     if (!confirm(`"${exercise.name}" verwijderen?`)) return;
@@ -344,8 +396,9 @@ function renderExerciseRow(day, exercise, rootContainer) {
     renderSchemaEditor(rootContainer);
   });
   deleteBtn.classList.add("btn-danger");
-  row.appendChild(deleteBtn);
+  actions.appendChild(deleteBtn);
 
+  row.appendChild(actions);
   return row;
 }
 

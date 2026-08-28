@@ -67,7 +67,10 @@ function buildSessionsContext(sessions) {
         return `${entry.exerciseName}: ${setsStr}`;
       })
       .join("; ");
-    return `- ${dateLabel} (${session.dayName}): ${entryLines || "geen sets gelogd"}`;
+    // The note carries the subjective side — poor sleep, a niggling shoulder —
+    // that the numbers alone don't show but that changes the advice.
+    const noteSuffix = session.note ? ` [notitie: ${session.note}]` : "";
+    return `- ${dateLabel} (${session.dayName}): ${entryLines || "geen sets gelogd"}${noteSuffix}`;
   });
   return `\n\nRecent gelogde trainingssessies van de gebruiker (nieuwste eerst):\n${lines.join("\n")}`;
 }

@@ -63,7 +63,8 @@ it with its own icon, launching full-screen like a real app.
 - `js/volume-stats.js` — pure aggregation helpers: weekly training volume, split per movement type, and Epley 1RM estimates
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
-- `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
+- `js/today-view.js` — the Vandaag tab: shows the next workout with last time's sets per exercise, logs a session (with an optional note)
+- `js/app-update.js` — offers a reload when the service worker has a new version waiting
 - `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab). Holds a screen wake lock while resting and fires a notification at zero, so locking the phone mid-set doesn't swallow the alert
 - `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)
 - `js/backup.js` — full JSON backup/restore of schema, sessions, body metrics and photos

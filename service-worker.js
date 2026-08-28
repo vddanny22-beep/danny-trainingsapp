@@ -1,4 +1,4 @@
-const CACHE_NAME = "trainingsapp-v10";
+const CACHE_NAME = "trainingsapp-v11";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -17,6 +17,7 @@ const APP_SHELL = [
   "./js/ai-chat.js",
   "./js/chat-view.js",
   "./js/rest-timer.js",
+  "./js/app-update.js",
   "./js/backup.js",
   "./js/volume-stats.js",
   "./icons/icon.svg",
@@ -35,7 +36,14 @@ self.addEventListener("install", (event) => {
       Promise.all(APP_SHELL.map((url) => fetch(url, { cache: "reload" }).then((resp) => cache.put(url, resp))))
     )
   );
-  self.skipWaiting();
+  // Deliberately no skipWaiting() here: a silent takeover leaves open pages
+  // running the previous version's JS with no sign anything changed. The new
+  // worker waits until the page offers the user a reload (see js/app-update.js)
+  // and posts the message below.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
