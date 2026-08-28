@@ -67,17 +67,27 @@ export async function renderChatView(container) {
 
     sendBtn.disabled = true;
     status.textContent = "De coach denkt na...";
-    const typingBubble = renderBubble("assistant", "…");
-    messageList.appendChild(typingBubble);
+
+    // The same bubble that shows the placeholder fills in as the answer
+    // streams, so there is no flash of removing and re-adding it at the end.
+    const answerBubble = renderBubble("assistant", "…");
+    messageList.appendChild(answerBubble);
     scrollToBottom(messageList);
 
     const history = (await storage.getChatMessages()).slice(-MAX_HISTORY_SENT);
-    const result = await sendChatMessage(history);
+    const result = await sendChatMessage(history, (partial) => {
+      // Checked before the text grows: only keep pinning to the bottom if the
+      // user was already there, so scrolling up to re-read isn't yanked back.
+      const stick = isNearBottom(messageList);
+      answerBubble.textContent = partial;
+      status.textContent = "";
+      if (stick) scrollToBottom(messageList);
+    });
 
-    typingBubble.remove();
     sendBtn.disabled = false;
 
     if (!result.ok) {
+      answerBubble.remove();
       status.textContent = result.message;
       status.classList.add("warn");
       return;
@@ -85,9 +95,13 @@ export async function renderChatView(container) {
     status.textContent = "";
     status.classList.remove("warn");
 
-    const assistantMessage = { id: crypto.randomUUID(), role: "assistant", content: result.text, createdAt: new Date().toISOString() };
-    await storage.saveChatMessage(assistantMessage);
-    messageList.appendChild(renderBubble("assistant", result.text));
+    answerBubble.textContent = result.text;
+    await storage.saveChatMessage({
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: result.text,
+      createdAt: new Date().toISOString(),
+    });
     scrollToBottom(messageList);
   });
 
@@ -156,4 +170,8 @@ function renderBubble(role, text) {
 
 function scrollToBottom(messageList) {
   messageList.scrollTop = messageList.scrollHeight;
+}
+
+function isNearBottom(messageList) {
+  return messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 60;
 }

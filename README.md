@@ -68,7 +68,7 @@ it with its own icon, launching full-screen like a real app.
 - `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)
 - `js/backup.js` — full JSON backup/restore of schema, sessions, body metrics and photos
 - `js/sheet-sync.js` — one-way sync (app → Sheet), calls the Apps Script Web App bridge
-- `js/ai-chat.js` — AI Coach: API key storage + the call to the Anthropic API
+- `js/ai-chat.js` — AI Coach: API key storage + the streaming call to the Anthropic API (parses the SSE response itself)
 - `js/chat-view.js` — the AI Coach tab: chat UI, persists history to IndexedDB
 - `js/app.js` — wires everything together on page load
 - `sheet-sync/AppsScript.gs` — reference code Danny pastes into his Sheet's Apps Script editor to receive synced rows (one-time setup, instructions in the file's header comment)

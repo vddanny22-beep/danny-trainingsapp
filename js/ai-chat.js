@@ -9,7 +9,10 @@ import * as storage from "./storage.js";
 const API_KEY_STORAGE_KEY = "trainingsapp.aiApiKey";
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-5";
-const MAX_TOKENS = 1536;
+// Streaming removes the request-timeout pressure that kept this low, so the
+// ceiling is now only there to bound cost. The system prompt is what keeps
+// answers short; max_tokens only ever truncates mid-sentence.
+const MAX_TOKENS = 4096;
 
 // Keeps the coach on-topic and safe: fitness/strength-training/nutrition
 // only, no medical diagnoses, grounded in the user's own schema, recent
@@ -92,10 +95,44 @@ async function buildUserContext() {
   return buildScheduleContext(days) + buildSessionsContext(sessions) + buildBodyLogsContext(bodyLogs);
 }
 
+// Yields each parsed SSE payload from a streaming response body. Events are
+// separated by a blank line, so whatever trails the last separator is a
+// partial event that has to wait for more bytes before it can be parsed.
+async function* readServerSentEvents(body) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop();
+
+    for (const event of events) {
+      for (const line of event.split(/\r?\n/)) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          continue; // ignore a malformed frame rather than killing the stream
+        }
+        yield parsed;
+      }
+    }
+  }
+}
+
 // `history` is an array of { role: "user"|"assistant", content: string },
-// oldest first. Returns { ok: true, text } or { ok: false, message } — never
-// throws, so callers can render the message straight into the chat.
-export async function sendChatMessage(history) {
+// oldest first. `onDelta` is called with the answer so far as it streams in.
+// Returns { ok: true, text } or { ok: false, message } — never throws, so
+// callers can render the message straight into the chat.
+export async function sendChatMessage(history, onDelta) {
   const apiKey = getApiKey();
   if (!apiKey) {
     return { ok: false, message: "Stel eerst je API-key in bij AI Coach-instellingen." };
@@ -118,6 +155,7 @@ export async function sendChatMessage(history) {
         max_tokens: MAX_TOKENS,
         system: SYSTEM_PROMPT + userContext,
         output_config: { effort: "medium" },
+        stream: true,
         messages: history.map((m) => ({ role: m.role, content: m.content })),
       }),
     });
@@ -142,23 +180,43 @@ export async function sendChatMessage(history) {
     return { ok: false, message: `AI-aanvraag mislukt (${response.status}). ${detail}`.trim() };
   }
 
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ok: false, message: "AI-aanvraag mislukt: geen geldig antwoord ontvangen." };
+  if (!response.body) {
+    return { ok: false, message: "AI-aanvraag mislukt: geen antwoordstroom ontvangen." };
   }
-  if (payload.stop_reason === "refusal") {
+
+  let text = "";
+  let stopReason = null;
+  let streamError = null;
+
+  try {
+    for await (const event of readServerSentEvents(response.body)) {
+      if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+        // Only text_delta: with adaptive thinking the stream also carries
+        // thinking deltas, which are not part of the answer.
+        text += event.delta.text;
+        onDelta?.(text);
+      } else if (event.type === "message_delta" && event.delta?.stop_reason) {
+        stopReason = event.delta.stop_reason;
+      } else if (event.type === "error") {
+        streamError = event.error?.message || "onbekende fout";
+      }
+    }
+  } catch (err) {
+    // A connection dropped mid-answer still leaves usable text on screen;
+    // only report failure when nothing arrived at all.
+    if (!text) {
+      return { ok: false, message: `Verbinding met de AI verbroken: ${err.message}` };
+    }
+  }
+
+  if (streamError && !text) {
+    return { ok: false, message: `AI-aanvraag mislukt: ${streamError}` };
+  }
+  if (stopReason === "refusal") {
     return { ok: false, message: "De AI kon deze vraag niet beantwoorden." };
   }
-  const text = (payload.content || [])
-    .filter((block) => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-
-  if (!text) {
+  if (!text.trim()) {
     return { ok: false, message: "De AI gaf geen antwoord terug. Probeer het opnieuw." };
   }
-  return { ok: true, text };
+  return { ok: true, text: text.trim() };
 }
