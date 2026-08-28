@@ -23,17 +23,20 @@ Then open `http://localhost:8000` in a browser.
 
 ## Deploying (for installing on your phone)
 
-To install it as an app on Android, it needs a stable HTTPS URL. The simplest
-option is GitHub Pages, using the GitHub account already set up for this workspace:
+**Live at: https://vddanny22-beep.github.io/danny-trainingsapp/**
 
-1. In the repo settings on GitHub, enable Pages for this repository, serving from
-   the `main` branch, folder `/apps/trainingsapp` (or move/copy this folder to a
-   dedicated `gh-pages` branch/root if GitHub Pages doesn't support a subfolder
-   for your setup — check current GitHub Pages settings, this has changed over time).
-2. Once published, open the resulting URL on your Android phone in Chrome.
-3. Tap the browser menu, then **"Add to Home screen"** (or Chrome may prompt this
-   automatically). This installs it with its own icon, launching full-screen like
-   a real app.
+GitHub Pages doesn't support private repos on the free plan, so this app is
+deployed from a separate **public** repo — code only, no personal data —
+rather than from this (private) workspace repo:
+[github.com/vddanny22-beep/danny-trainingsapp](https://github.com/vddanny22-beep/danny-trainingsapp).
+
+To redeploy after changing files here in `apps/trainingsapp/`: copy the changed
+files into a checkout of that repo's `main` branch, commit, and push — GitHub
+Pages picks up the update automatically within a minute or two.
+
+To install on Android: open the live URL above in Chrome, tap the menu, then
+**"Add to Home screen"** (or Chrome may prompt this automatically). This installs
+it with its own icon, launching full-screen like a real app.
 
 ## What's in here
 

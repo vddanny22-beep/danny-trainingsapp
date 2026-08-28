@@ -187,3 +187,94 @@ h2 {
   border-bottom: 1px solid var(--border);
   gap: 4px;
 }
+
+/* Geschiedenis tab */
+
+.session-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.session-item {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.session-summary {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.session-details {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.session-details li {
+  padding: 2px 0;
+}
+
+.progress-list {
+  margin-bottom: 24px;
+}
+
+.progress-row {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-label {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.sparkline {
+  width: 100%;
+  height: 40px;
+  display: block;
+}
+
+/* Sync-instellingen */
+
+.sync-settings {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 16px;
+}
+
+.sync-help {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+
+.sync-url-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.sync-status {
+  margin-top: 8px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.sync-status.warn {
+  color: var(--danger);
+}

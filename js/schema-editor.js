@@ -1,4 +1,5 @@
 import * as storage from "./storage.js";
+import { getSyncUrl, setSyncUrl, syncNow } from "./sheet-sync.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -31,6 +32,53 @@ export async function renderSchemaEditor(container) {
     renderSchemaEditor(container);
   });
   container.appendChild(addDayBtn);
+  container.appendChild(renderSyncSettings());
+}
+
+function renderSyncSettings() {
+  const section = document.createElement("section");
+  section.className = "sync-settings";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Sync-instellingen";
+  section.appendChild(heading);
+
+  const help = document.createElement("p");
+  help.className = "sync-help";
+  help.textContent = "Eenmalig instellen: plak hier de Apps Script webapp-URL (zie sheet-sync/AppsScript.gs voor de stappen). Dit stuurt nieuw gelogde sessies naar een apart 'App Log'-tabblad in je Sheet, als backup.";
+  section.appendChild(help);
+
+  const urlInput = document.createElement("input");
+  urlInput.type = "url";
+  urlInput.placeholder = "https://script.google.com/macros/s/.../exec";
+  urlInput.value = getSyncUrl();
+  urlInput.className = "sync-url-input";
+  section.appendChild(urlInput);
+
+  const status = document.createElement("p");
+  status.className = "sync-status";
+
+  const saveBtn = smallButton("Opslaan", () => {
+    setSyncUrl(urlInput.value);
+    status.textContent = "URL opgeslagen.";
+  });
+  section.appendChild(saveBtn);
+
+  const syncBtn = document.createElement("button");
+  syncBtn.className = "btn btn-secondary";
+  syncBtn.textContent = "Sync nu";
+  syncBtn.addEventListener("click", async () => {
+    syncBtn.disabled = true;
+    status.textContent = "Bezig met synchroniseren...";
+    const result = await syncNow();
+    status.textContent = result.message || (result.ok ? "Klaar." : "Mislukt.");
+    status.classList.toggle("warn", !result.ok);
+    syncBtn.disabled = false;
+  });
+  section.appendChild(syncBtn);
+
+  section.appendChild(status);
+  return section;
 }
 
 function renderDayCard(day, rootContainer) {

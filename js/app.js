@@ -2,9 +2,11 @@ import * as storage from "./storage.js";
 import { getSeedDays } from "./seed.js";
 import { renderTodayView } from "./today-view.js";
 import { renderSchemaEditor } from "./schema-editor.js";
+import { renderHistoryView } from "./history-view.js";
 
 const content = document.getElementById("content");
 const navToday = document.getElementById("nav-today");
+const navHistory = document.getElementById("nav-history");
 const navSchema = document.getElementById("nav-schema");
 
 async function seedIfEmpty() {
@@ -16,7 +18,7 @@ async function seedIfEmpty() {
 }
 
 function setActiveNav(button) {
-  [navToday, navSchema].forEach((b) => b.classList.remove("active"));
+  [navToday, navHistory, navSchema].forEach((b) => b.classList.remove("active"));
   button.classList.add("active");
 }
 
@@ -25,12 +27,18 @@ async function showToday() {
   await renderTodayView(content);
 }
 
+async function showHistory() {
+  setActiveNav(navHistory);
+  await renderHistoryView(content);
+}
+
 async function showSchema() {
   setActiveNav(navSchema);
   await renderSchemaEditor(content);
 }
 
 navToday.addEventListener("click", showToday);
+navHistory.addEventListener("click", showHistory);
 navSchema.addEventListener("click", showSchema);
 
 async function init() {
