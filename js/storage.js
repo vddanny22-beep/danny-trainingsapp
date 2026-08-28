@@ -1,7 +1,8 @@
-// IndexedDB wrapper. Two object stores: "days" (schema) and "sessions" (log).
+// IndexedDB wrapper. Object stores: "days" (schema), "sessions" (workout log),
+// "bodyLogs" (weight/waist/note) and "photos" (progress photo blobs).
 
 const DB_NAME = "trainingsapp";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -10,12 +11,21 @@ export function initDB() {
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
+      // Every store is added only if missing, never recreated — this runs
+      // again on a real device with real existing data every time DB_VERSION
+      // goes up, so it must never touch what's already there.
       const db = req.result;
       if (!db.objectStoreNames.contains("days")) {
         db.createObjectStore("days", { keyPath: "id" });
       }
       if (!db.objectStoreNames.contains("sessions")) {
         db.createObjectStore("sessions", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("bodyLogs")) {
+        db.createObjectStore("bodyLogs", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("photos")) {
+        db.createObjectStore("photos", { keyPath: "id" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -79,4 +89,39 @@ export async function getLastEntryForExerciseName(exerciseName) {
     if (entry) return entry;
   }
   return null;
+}
+
+// Body metrics log: { id, date, weightKg, waistCm, note }. Local-only — never synced to the Sheet.
+export async function getBodyLogs() {
+  const store = await tx("bodyLogs", "readonly");
+  const logs = await requestToPromise(store.getAll());
+  return logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+export async function saveBodyLog(entry) {
+  const store = await tx("bodyLogs", "readwrite");
+  return requestToPromise(store.put(entry));
+}
+
+export async function deleteBodyLog(id) {
+  const store = await tx("bodyLogs", "readwrite");
+  return requestToPromise(store.delete(id));
+}
+
+// Progress photos: { id, date, label, blob }. Blobs stored natively — IndexedDB
+// supports them directly via structured clone, no base64 encoding needed.
+export async function getPhotos() {
+  const store = await tx("photos", "readonly");
+  const photos = await requestToPromise(store.getAll());
+  return photos.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+export async function savePhoto(entry) {
+  const store = await tx("photos", "readwrite");
+  return requestToPromise(store.put(entry));
+}
+
+export async function deletePhoto(id) {
+  const store = await tx("photos", "readwrite");
+  return requestToPromise(store.delete(id));
 }

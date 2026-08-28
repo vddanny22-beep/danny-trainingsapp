@@ -1,4 +1,4 @@
-const CACHE_NAME = "trainingsapp-v3";
+const CACHE_NAME = "trainingsapp-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,8 @@ const APP_SHELL = [
   "./js/today-view.js",
   "./js/history-view.js",
   "./js/sheet-sync.js",
+  "./js/sparkline.js",
+  "./js/progress-view.js",
   "./icons/icon.svg",
 ];
 

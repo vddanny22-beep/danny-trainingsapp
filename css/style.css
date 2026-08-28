@@ -301,3 +301,98 @@ h2 {
 .sync-status.warn {
   color: var(--danger);
 }
+
+/* Voortgang tab */
+
+.body-log-form,
+.photo-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.body-log-date,
+.body-log-weight,
+.body-log-waist,
+.body-log-note,
+.photo-file-input,
+.photo-label-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.body-log-note {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.trend-section {
+  margin-bottom: 16px;
+}
+
+.trend-section .progress-label {
+  color: var(--text-primary);
+}
+
+.body-log-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.body-log-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.photo-gallery {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.photo-cell {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  text-align: center;
+}
+
+.photo-thumb {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  display: block;
+}
+
+.photo-cell.enlarged {
+  grid-column: 1 / -1;
+}
+
+.photo-cell.enlarged .photo-thumb {
+  height: auto;
+  object-fit: contain;
+}
+
+.photo-cell-label {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

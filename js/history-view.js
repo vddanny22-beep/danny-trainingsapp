@@ -1,4 +1,5 @@
 import * as storage from "./storage.js";
+import { renderSparkline } from "./sparkline.js";
 
 // Renders the Geschiedenis tab: a session list (newest first) and a lightweight
 // per-exercise progress trend, built from the same session history storage.js
@@ -106,34 +107,4 @@ function renderProgressRow(exerciseName, weights) {
 
   row.appendChild(renderSparkline(weights));
   return row;
-}
-
-function renderSparkline(weights) {
-  const width = 240;
-  const height = 40;
-  const padding = 4;
-
-  const min = Math.min(...weights);
-  const max = Math.max(...weights);
-  const range = max - min || 1; // avoid divide-by-zero when every value is equal
-
-  const points = weights.map((w, i) => {
-    const x = weights.length === 1 ? width / 2 : padding + (i / (weights.length - 1)) * (width - 2 * padding);
-    const y = height - padding - ((w - min) / range) * (height - 2 * padding);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("class", "sparkline");
-
-  const polyline = document.createElementNS(svgNS, "polyline");
-  polyline.setAttribute("points", points.join(" "));
-  polyline.setAttribute("fill", "none");
-  polyline.setAttribute("stroke-width", "2");
-  // Stroke color comes from .sparkline polyline in style.css, not set here.
-  svg.appendChild(polyline);
-
-  return svg;
 }
