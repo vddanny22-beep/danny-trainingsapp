@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
+import { bestOneRepMax } from "./volume-stats.js";
 
 // Renders the Geschiedenis tab: a session list (newest first) and a lightweight
 // per-exercise progress trend, built from the same session history storage.js
@@ -202,34 +203,48 @@ function renderProgressSection(sessions) {
     for (const entry of session.entries) {
       if (!entry.sets.length) continue;
       const topWeight = Math.max(...entry.sets.map((s) => s.weight));
-      if (!byExercise.has(entry.exerciseName)) byExercise.set(entry.exerciseName, []);
-      byExercise.get(entry.exerciseName).push(topWeight);
+      if (!byExercise.has(entry.exerciseName)) byExercise.set(entry.exerciseName, { weights: [], oneRepMaxes: [] });
+      const trend = byExercise.get(entry.exerciseName);
+      trend.weights.push(topWeight);
+      trend.oneRepMaxes.push(bestOneRepMax(entry));
     }
   }
 
   const list = document.createElement("div");
   list.className = "progress-list";
-  for (const [exerciseName, weights] of byExercise.entries()) {
-    list.appendChild(renderProgressRow(exerciseName, weights));
+  for (const [exerciseName, trend] of byExercise.entries()) {
+    list.appendChild(renderProgressRow(exerciseName, trend));
   }
   section.appendChild(list);
   return section;
 }
 
-function renderProgressRow(exerciseName, weights) {
+// Rounded to 1 decimal to avoid floating-point noise like
+// "42.4 - 39 = 3.3999999999999986".
+function formatDelta(first, last) {
+  const delta = Math.round((last - first) * 10) / 10;
+  if (delta === 0) return "gelijk gebleven";
+  return delta > 0 ? `+${delta}kg` : `${delta}kg`;
+}
+
+function renderProgressRow(exerciseName, { weights, oneRepMaxes }) {
   const row = document.createElement("div");
   row.className = "progress-row";
 
   const label = document.createElement("div");
   label.className = "progress-label";
-  const first = weights[0];
-  const last = weights[weights.length - 1];
-  // Rounded to 1 decimal to avoid floating-point noise like "42.4 - 39 = 3.3999999999999986".
-  const delta = Math.round((last - first) * 10) / 10;
-  const deltaText = delta === 0 ? "gelijk gebleven" : delta > 0 ? `+${delta}kg` : `${delta}kg`;
-  label.textContent = `${exerciseName}: ${first}kg → ${last}kg (${deltaText})`;
+  label.textContent = `${exerciseName}: ${weights[0]}kg → ${weights[weights.length - 1]}kg (${formatDelta(weights[0], weights[weights.length - 1])})`;
   row.appendChild(label);
 
-  row.appendChild(renderSparkline(weights));
+  // The plotted line is the estimated 1RM, not the raw top weight. This app's
+  // progression rule only adds weight once you reach the top of the rep range,
+  // so the weight trend is a staircase that sits flat for weeks while the reps
+  // — and the actual strength — keep climbing.
+  const estimate = document.createElement("div");
+  estimate.className = "progress-sublabel";
+  estimate.textContent = `Geschat 1RM: ${oneRepMaxes[0]}kg → ${oneRepMaxes[oneRepMaxes.length - 1]}kg (${formatDelta(oneRepMaxes[0], oneRepMaxes[oneRepMaxes.length - 1])})`;
+  row.appendChild(estimate);
+
+  row.appendChild(renderSparkline(oneRepMaxes));
   return row;
 }

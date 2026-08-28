@@ -60,6 +60,7 @@ it with its own icon, launching full-screen like a real app.
 - `css/style.css` — mobile-first styling
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
 - `js/progression.js` — the weight auto-progression rule, ported from the Sheet
+- `js/volume-stats.js` — pure aggregation helpers: weekly training volume, split per movement type, and Epley 1RM estimates
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
 - `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
