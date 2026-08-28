@@ -5,6 +5,7 @@ import { renderSchemaEditor } from "./schema-editor.js";
 import { renderHistoryView } from "./history-view.js";
 import { renderProgressView } from "./progress-view.js";
 import { renderChatView } from "./chat-view.js";
+import { watchForUpdates } from "./app-update.js";
 
 const content = document.getElementById("content");
 const navToday = document.getElementById("nav-today");
@@ -63,9 +64,12 @@ async function init() {
   await showToday();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js").catch((err) => {
-      console.warn("Service worker registration failed:", err);
-    });
+    navigator.serviceWorker
+      .register("service-worker.js")
+      .then(watchForUpdates)
+      .catch((err) => {
+        console.warn("Service worker registration failed:", err);
+      });
   }
 }
 

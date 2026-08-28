@@ -55,6 +55,12 @@ async function renderForDay(container, days, selectedDayId) {
     form.appendChild(await renderExerciseBlock(exercise, day));
   }
 
+  const note = document.createElement("textarea");
+  note.className = "session-note-input";
+  note.placeholder = "Notitie (optioneel) — bv. slecht geslapen, schouder gevoelig";
+  note.rows = 2;
+  form.appendChild(note);
+
   const saveBtn = document.createElement("button");
   saveBtn.type = "submit";
   saveBtn.className = "btn btn-primary";
@@ -91,12 +97,27 @@ async function renderExerciseBlock(exercise, day) {
   legend.textContent = `${exercise.name} (${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps)`;
   block.appendChild(legend);
 
-  const suggestedWeight = await computeSuggestedWeight(exercise, day);
+  // Fetched once and used for both lines below — the suggestion is derived
+  // from exactly the sets shown as "vorige keer".
+  const last = await storage.getLastEntryForExerciseName(exercise.name);
+
+  const suggestedWeight = computeSuggestedWeight(last, exercise, day);
   if (suggestedWeight != null) {
     const hint = document.createElement("p");
     hint.className = "suggested-weight";
     hint.textContent = `Voorgesteld gewicht: ${suggestedWeight} kg`;
     block.appendChild(hint);
+  }
+
+  // The suggestion alone doesn't say whether you cruised through last time or
+  // barely finished — the actual reps do, and that's what decides whether to
+  // push today.
+  if (last?.entry.sets.length) {
+    const previous = document.createElement("p");
+    previous.className = "previous-sets";
+    const setsText = last.entry.sets.map((set) => `${set.weight}×${set.reps}`).join("  ");
+    previous.textContent = `Vorige keer (${formatShortDate(last.date)}): ${setsText}`;
+    block.appendChild(previous);
   }
 
   for (let i = 1; i <= exercise.sets; i++) {
@@ -133,10 +154,13 @@ async function renderExerciseBlock(exercise, day) {
   return block;
 }
 
-async function computeSuggestedWeight(exercise, day) {
-  const lastEntry = await storage.getLastEntryForExerciseName(exercise.name);
-  if (!lastEntry || !lastEntry.sets.length) return null;
-  const lastSet = lastEntry.sets[lastEntry.sets.length - 1];
+function formatShortDate(date) {
+  return new Date(date).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+function computeSuggestedWeight(last, exercise, day) {
+  if (!last || !last.entry.sets.length) return null;
+  const lastSet = last.entry.sets[last.entry.sets.length - 1];
   if (lastSet.weight == null || lastSet.reps == null) return null;
   const hitTop = hitTopOfRange(lastSet.reps, exercise.repMax);
   return suggestNextWeight(lastSet.weight, hitTop, isLegDay(day.name));
@@ -167,6 +191,7 @@ function buildSessionFromForm(form, day) {
     date: new Date().toISOString(),
     dayId: day.id,
     dayName: day.name,
+    note: form.querySelector(".session-note-input").value.trim(),
     entries,
   };
 }

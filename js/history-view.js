@@ -81,6 +81,8 @@ function renderSessionItem(session, container) {
 }
 
 function renderSessionDetails(session) {
+  const wrap = document.createElement("div");
+
   const details = document.createElement("ul");
   details.className = "session-details";
   session.entries.forEach((entry) => {
@@ -89,7 +91,16 @@ function renderSessionDetails(session) {
     detail.textContent = `${entry.exerciseName}: ${setsText}`;
     details.appendChild(detail);
   });
-  return details;
+  wrap.appendChild(details);
+
+  if (session.note) {
+    const note = document.createElement("p");
+    note.className = "session-note";
+    note.textContent = session.note;
+    wrap.appendChild(note);
+  }
+
+  return wrap;
 }
 
 // Inline editor for one logged session. Correcting a mistyped weight matters
@@ -136,6 +147,13 @@ function renderSessionEditor(session, container) {
     form.appendChild(block);
   });
 
+  const noteInput = document.createElement("textarea");
+  noteInput.className = "session-note-input";
+  noteInput.placeholder = "Notitie (optioneel)";
+  noteInput.rows = 2;
+  noteInput.value = session.note || "";
+  form.appendChild(noteInput);
+
   const status = document.createElement("p");
   status.className = "save-status";
 
@@ -173,7 +191,7 @@ function renderSessionEditor(session, container) {
       return;
     }
 
-    await storage.saveSession({ ...session, entries });
+    await storage.saveSession({ ...session, entries, note: noteInput.value.trim() });
     renderHistoryView(container);
   });
 
