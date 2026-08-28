@@ -61,7 +61,7 @@ it with its own icon, launching full-screen like a real app.
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
 - `js/progression.js` — the weight auto-progression rule, ported from the Sheet
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
-- `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises, plus the Sync-instellingen section
+- `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
 - `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
 - `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab)
 - `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)

@@ -22,16 +22,20 @@ export async function renderSchemaEditor(container) {
   const addDayBtn = document.createElement("button");
   addDayBtn.className = "btn btn-secondary";
   addDayBtn.textContent = "+ Dag toevoegen";
-  addDayBtn.addEventListener("click", async () => {
-    const name = prompt("Naam van de nieuwe dag (bijv. 'Zaterdag – Push'):");
-    if (!name) return;
-    await storage.saveDay({
-      id: crypto.randomUUID(),
-      name,
-      order: days.length,
-      exercises: [],
-    });
-    renderSchemaEditor(container);
+  addDayBtn.addEventListener("click", () => {
+    addDayBtn.replaceWith(renderDayNameForm({
+      submitLabel: "Toevoegen",
+      onCancel: () => renderSchemaEditor(container),
+      onSubmit: async (name) => {
+        await storage.saveDay({
+          id: crypto.randomUUID(),
+          name,
+          order: days.length,
+          exercises: [],
+        });
+        renderSchemaEditor(container);
+      },
+    }));
   });
   container.appendChild(addDayBtn);
   container.appendChild(renderTrainingSettings());
@@ -204,11 +208,16 @@ function renderDayCard(day, rootContainer) {
   title.textContent = day.name;
   header.appendChild(title);
 
-  const renameBtn = smallButton("Naam wijzigen", async () => {
-    const name = prompt("Nieuwe naam:", day.name);
-    if (!name) return;
-    await storage.saveDay({ ...day, name });
-    renderSchemaEditor(rootContainer);
+  const renameBtn = smallButton("Naam wijzigen", () => {
+    header.replaceWith(renderDayNameForm({
+      value: day.name,
+      submitLabel: "Opslaan",
+      onCancel: () => renderSchemaEditor(rootContainer),
+      onSubmit: async (name) => {
+        await storage.saveDay({ ...day, name });
+        renderSchemaEditor(rootContainer);
+      },
+    }));
   });
   header.appendChild(renameBtn);
 
@@ -227,18 +236,18 @@ function renderDayCard(day, rootContainer) {
   day.exercises.forEach((ex) => exerciseList.appendChild(renderExerciseRow(day, ex, rootContainer)));
   card.appendChild(exerciseList);
 
-  const addExerciseBtn = smallButton("+ Oefening toevoegen", async () => {
-    const name = prompt("Naam van de oefening:");
-    if (!name) return;
-    const updatedDay = {
-      ...day,
-      exercises: [
-        ...day.exercises,
-        { id: crypto.randomUUID(), name, sets: 4, repMin: 6, repMax: 10 },
-      ],
-    };
-    await storage.saveDay(updatedDay);
-    renderSchemaEditor(rootContainer);
+  const addExerciseBtn = smallButton("+ Oefening toevoegen", () => {
+    addExerciseBtn.replaceWith(renderExerciseForm({
+      submitLabel: "Toevoegen",
+      onCancel: () => renderSchemaEditor(rootContainer),
+      onSubmit: async (values) => {
+        await storage.saveDay({
+          ...day,
+          exercises: [...day.exercises, { id: crypto.randomUUID(), ...values }],
+        });
+        renderSchemaEditor(rootContainer);
+      },
+    }));
   });
   card.appendChild(addExerciseBtn);
 
@@ -253,17 +262,23 @@ function renderExerciseRow(day, exercise, rootContainer) {
   label.textContent = `${exercise.name} — ${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps`;
   row.appendChild(label);
 
-  const editBtn = smallButton("Bewerken", async () => {
-    const name = prompt("Naam:", exercise.name);
-    if (!name) return;
-    const sets = parseInt(prompt("Aantal sets:", exercise.sets), 10) || exercise.sets;
-    const repMin = parseInt(prompt("Rep-range, minimum:", exercise.repMin), 10) || exercise.repMin;
-    const repMax = parseInt(prompt("Rep-range, maximum:", exercise.repMax), 10) || exercise.repMax;
-    const updatedExercises = day.exercises.map((e) =>
-      e.id === exercise.id ? { ...e, name, sets, repMin, repMax } : e
-    );
-    await storage.saveDay({ ...day, exercises: updatedExercises });
-    renderSchemaEditor(rootContainer);
+  const editBtn = smallButton("Bewerken", () => {
+    // Replaces the row's contents rather than the <li> itself, so the form
+    // stays properly nested inside the exercise list.
+    row.innerHTML = "";
+    row.classList.add("exercise-row-editing");
+    row.appendChild(renderExerciseForm({
+      exercise,
+      submitLabel: "Opslaan",
+      onCancel: () => renderSchemaEditor(rootContainer),
+      onSubmit: async (values) => {
+        const updatedExercises = day.exercises.map((e) =>
+          e.id === exercise.id ? { ...e, ...values } : e
+        );
+        await storage.saveDay({ ...day, exercises: updatedExercises });
+        renderSchemaEditor(rootContainer);
+      },
+    }));
   });
   row.appendChild(editBtn);
 
@@ -285,4 +300,153 @@ function smallButton(text, onClick) {
   btn.textContent = text;
   btn.addEventListener("click", onClick);
   return btn;
+}
+
+// --- Inline forms ---------------------------------------------------------
+// Every schema edit used to run through prompt(): four stacked browser popups
+// just to change one exercise, with no validation and no way back once you'd
+// started. Now that the app installs and runs full-screen, those dialogs were
+// the last thing that still looked like a web page, so each edit happens in a
+// small form in place instead.
+
+function formRow(labelText, input) {
+  const row = document.createElement("label");
+  row.className = "inline-form-row";
+  const caption = document.createElement("span");
+  caption.textContent = labelText;
+  row.appendChild(caption);
+  row.appendChild(input);
+  return row;
+}
+
+function textInput(value, placeholder) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "inline-form-input";
+  input.value = value;
+  input.placeholder = placeholder;
+  return input;
+}
+
+function numberInput(value) {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.className = "inline-form-input";
+  input.min = "1";
+  input.value = value;
+  return input;
+}
+
+function formActions(submitLabel, onCancel) {
+  const actions = document.createElement("div");
+  actions.className = "inline-form-actions";
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "btn btn-small btn-accent";
+  submit.textContent = submitLabel;
+  actions.appendChild(submit);
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "btn btn-small";
+  cancel.textContent = "Annuleren";
+  cancel.addEventListener("click", onCancel);
+  actions.appendChild(cancel);
+
+  return actions;
+}
+
+// Focused once it is actually in the document — focus() on a detached node
+// does nothing, and these forms are built before being inserted.
+function focusOnInsert(input) {
+  requestAnimationFrame(() => input.focus());
+}
+
+// One text field, shared by "add day" and "rename day".
+function renderDayNameForm({ value = "", submitLabel, onSubmit, onCancel }) {
+  const form = document.createElement("form");
+  form.className = "inline-form";
+  // Native constraint validation would otherwise block submit before our own
+  // check runs, and report it in a browser-language tooltip instead of the
+  // in-form Dutch message the rest of the app uses.
+  form.noValidate = true;
+
+  const nameInput = textInput(value, "bijv. Zaterdag – Push");
+  form.appendChild(formRow("Naam", nameInput));
+
+  const error = document.createElement("p");
+  error.className = "inline-form-error";
+  form.appendChild(error);
+  form.appendChild(formActions(submitLabel, onCancel));
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = nameInput.value.trim();
+    if (!name) {
+      error.textContent = "Vul een naam in.";
+      return;
+    }
+    onSubmit(name);
+  });
+
+  focusOnInsert(nameInput);
+  return form;
+}
+
+// The same four fields for both adding and editing an exercise; `exercise`
+// is omitted when adding, and the defaults match what the old prompt flow
+// silently assumed.
+function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
+  const form = document.createElement("form");
+  form.className = "inline-form";
+  // Native constraint validation would otherwise block submit before our own
+  // check runs, and report it in a browser-language tooltip instead of the
+  // in-form Dutch message the rest of the app uses.
+  form.noValidate = true;
+
+  const nameInput = textInput(exercise?.name ?? "", "bijv. Chest Press");
+  const setsInput = numberInput(exercise?.sets ?? 4);
+  const repMinInput = numberInput(exercise?.repMin ?? 6);
+  const repMaxInput = numberInput(exercise?.repMax ?? 10);
+
+  form.appendChild(formRow("Oefening", nameInput));
+  form.appendChild(formRow("Sets", setsInput));
+  form.appendChild(formRow("Reps min.", repMinInput));
+  form.appendChild(formRow("Reps max.", repMaxInput));
+
+  const error = document.createElement("p");
+  error.className = "inline-form-error";
+  form.appendChild(error);
+  form.appendChild(formActions(submitLabel, onCancel));
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = nameInput.value.trim();
+    const sets = parseInt(setsInput.value, 10);
+    const repMin = parseInt(repMinInput.value, 10);
+    const repMax = parseInt(repMaxInput.value, 10);
+
+    // Written as `!(x >= 1)` so a blank field (NaN) fails too.
+    if (!name) {
+      error.textContent = "Vul een naam in.";
+      return;
+    }
+    if (!(sets >= 1)) {
+      error.textContent = "Vul minstens 1 set in.";
+      return;
+    }
+    if (!(repMin >= 1) || !(repMax >= 1)) {
+      error.textContent = "Vul een geldige rep-range in.";
+      return;
+    }
+    if (repMax < repMin) {
+      error.textContent = "Maximale reps mogen niet lager zijn dan de minimale.";
+      return;
+    }
+    onSubmit({ name, sets, repMin, repMax });
+  });
+
+  focusOnInsert(nameInput);
+  return form;
 }

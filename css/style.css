@@ -267,6 +267,76 @@ h2 {
   border-color: var(--danger);
 }
 
+.btn-accent {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+/* Inline formulieren (Schema-tab) */
+
+.inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--bg-card-alt);
+}
+
+.inline-form-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-form-row span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.inline-form-input {
+  width: 100%;
+  padding: 10px;
+  /* 16px keeps iOS from zooming the page in when the field takes focus. */
+  font-size: 16px;
+  font-family: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.inline-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form-actions .btn {
+  flex: 1;
+  margin-left: 0;
+}
+
+.inline-form-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.inline-form-error:empty {
+  display: none;
+}
+
+.exercise-row-editing {
+  display: block;
+  border-bottom: none;
+}
+
 .save-status {
   color: var(--accent);
   font-weight: 600;
@@ -299,14 +369,20 @@ h2 {
   margin: 12px 0;
 }
 
+/* Grid rather than a wrapping flex row: with space-between the two buttons
+   used to break to their own lines independently, so each row sat differently
+   from the one above it. */
 .exercise-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  padding: 8px 0;
+  gap: 8px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
-  gap: 4px;
+}
+
+.exercise-row .btn-small {
+  margin-left: 0;
 }
 
 /* Geschiedenis tab */
