@@ -131,8 +131,8 @@ function renderSparkline(weights) {
   const polyline = document.createElementNS(svgNS, "polyline");
   polyline.setAttribute("points", points.join(" "));
   polyline.setAttribute("fill", "none");
-  polyline.setAttribute("stroke", "#1c4587");
   polyline.setAttribute("stroke-width", "2");
+  // Stroke color comes from .sparkline polyline in style.css, not set here.
   svg.appendChild(polyline);
 
   return svg;

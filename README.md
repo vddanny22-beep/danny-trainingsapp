@@ -2,11 +2,13 @@
 
 A phone-installable workout tracker that replaces the "Trainingsschema" Google Sheet
 for day-to-day use. Shows today's workout with a suggested weight per exercise
-(same auto-progression logic as the Sheet), lets you log sets/reps, and lets you
-edit your own schema — no hardcoded plan.
+(same auto-progression logic as the Sheet), lets you log sets/reps, lets you see
+your history and progress per exercise, and lets you edit your own schema — no
+hardcoded plan.
 
-Phase 1 build: plain HTML/CSS/JS, no framework, no build step. Data lives on the
-phone (IndexedDB), so it works with no signal at the gym.
+Plain HTML/CSS/JS, no framework, no build step. Data lives on the phone
+(IndexedDB), so it works with no signal at the gym. Optionally backs up newly
+logged sessions to your Google Sheet with a manual "Sync nu" button.
 
 ## Running it locally
 
@@ -40,20 +42,30 @@ it with its own icon, launching full-screen like a real app.
 
 ## What's in here
 
-- `index.html` — app shell, two views (Today / Schema) toggled by JS
+- `index.html` — app shell, three views (Vandaag / Geschiedenis / Schema) toggled by JS
 - `manifest.json` — PWA manifest (name, icons, standalone display)
 - `service-worker.js` — caches the app for offline use
 - `css/style.css` — mobile-first styling
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
 - `js/progression.js` — the weight auto-progression rule, ported from the Sheet
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
-- `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises
-- `js/today-view.js` — the Today tab: shows the next workout, logs a session
+- `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises, plus the Sync-instellingen section
+- `js/today-view.js` — the Vandaag tab: shows the next workout, logs a session
+- `js/history-view.js` — the Geschiedenis tab: past sessions + per-exercise progress (SVG sparklines)
+- `js/sheet-sync.js` — one-way sync (app → Sheet), calls the Apps Script Web App bridge
 - `js/app.js` — wires everything together on page load
+- `sheet-sync/AppsScript.gs` — reference code Danny pastes into his Sheet's Apps Script editor to receive synced rows (one-time setup, instructions in the file's header comment)
+
+## Setting up Sheet sync (optional, one-time)
+
+1. Open the "Trainingsschema" Google Sheet → Extensions → Apps Script.
+2. Paste in the contents of `sheet-sync/AppsScript.gs`.
+3. Deploy → New deployment → type "Web app" → Execute as "Me", access "Anyone with the link".
+4. Copy the deployment URL into the app's Schema tab → Sync-instellingen → paste → Opslaan.
+5. Press "Sync nu" any time to push newly logged sessions to a new "App Log" tab in the Sheet — your existing Trainingslog tab and its formulas are never touched.
 
 ## What's next (not built yet)
 
-- **Phase 2:** history/log view, two-way sync with the Google Sheet
 - **Phase 3:** wrap with [Capacitor](https://capacitorjs.com/) to produce a real
   installable/publishable Android `.apk`, then Play Store prep
 
