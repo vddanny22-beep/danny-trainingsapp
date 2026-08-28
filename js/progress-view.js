@@ -1,5 +1,6 @@
 import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
+import { volumeByWeek, volumeByCategory, percentChange } from "./volume-stats.js";
 
 // Voortgang tab: body metrics (weight/waist/note) logged by date, plus local-only
 // progress photos. Entirely separate from sessions/sync — never touches
@@ -12,8 +13,110 @@ export async function renderProgressView(container) {
   heading.textContent = "Voortgang";
   container.appendChild(heading);
 
+  container.appendChild(await renderVolumeSection());
   container.appendChild(await renderBodyLogSection());
   container.appendChild(await renderPhotoSection());
+}
+
+const WEEKS_SHOWN = 12;
+const CATEGORY_WINDOW_WEEKS = 4;
+
+function formatKg(volume) {
+  return `${Math.round(volume).toLocaleString("nl-NL")} kg`;
+}
+
+// Whole-schema training stats, as opposed to the Geschiedenis tab's
+// per-exercise trends: total work done per week, and how it splits over
+// movement types — which is where a lagging Pull or skipped leg day shows up.
+async function renderVolumeSection() {
+  const section = document.createElement("section");
+  section.className = "trend-section";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Trainingsvolume";
+  section.appendChild(heading);
+
+  const sessions = await storage.getSessions();
+  if (!sessions.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "Log een training via Vandaag om je volume hier te zien.";
+    section.appendChild(empty);
+    return section;
+  }
+
+  const weeks = volumeByWeek(sessions, WEEKS_SHOWN);
+  const thisWeek = weeks[weeks.length - 1];
+  const lastWeek = weeks[weeks.length - 2];
+
+  const summary = document.createElement("div");
+  summary.className = "progress-label";
+  summary.textContent = thisWeek.sessions
+    ? `Deze week: ${formatKg(thisWeek.volume)} · ${thisWeek.sets} sets · ${thisWeek.sessions} ${thisWeek.sessions === 1 ? "sessie" : "sessies"}`
+    : "Deze week nog niet getraind.";
+  section.appendChild(summary);
+
+  const change = lastWeek ? percentChange(thisWeek.volume, lastWeek.volume) : null;
+  if (change !== null) {
+    const delta = document.createElement("p");
+    delta.className = change >= 0 ? "volume-delta up" : "volume-delta down";
+    delta.textContent = `${change >= 0 ? "+" : ""}${change}% t.o.v. vorige week (${formatKg(lastWeek.volume)})`;
+    section.appendChild(delta);
+  }
+
+  const caption = document.createElement("p");
+  caption.className = "sync-help";
+  caption.textContent = `Volume per week, laatste ${WEEKS_SHOWN} weken (gewicht × reps, alle sets bij elkaar).`;
+  section.appendChild(caption);
+  section.appendChild(renderSparkline(weeks.map((week) => week.volume)));
+
+  section.appendChild(renderCategoryBreakdown(sessions));
+  return section;
+}
+
+function renderCategoryBreakdown(sessions) {
+  const wrap = document.createElement("div");
+  wrap.className = "category-breakdown";
+
+  const since = new Date();
+  since.setDate(since.getDate() - CATEGORY_WINDOW_WEEKS * 7);
+  const categories = volumeByCategory(sessions, since);
+
+  const heading = document.createElement("div");
+  heading.className = "progress-label";
+  heading.textContent = `Verdeling (laatste ${CATEGORY_WINDOW_WEEKS} weken)`;
+  wrap.appendChild(heading);
+
+  if (!categories.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "Geen trainingen in deze periode.";
+    wrap.appendChild(empty);
+    return wrap;
+  }
+
+  // Bars are scaled against the biggest category, so the comparison between
+  // movement types stays readable whatever the absolute numbers are.
+  const max = categories[0].volume;
+  categories.forEach((row) => {
+    const item = document.createElement("div");
+    item.className = "category-row";
+
+    const label = document.createElement("div");
+    label.className = "category-row-label";
+    label.textContent = `${row.category} — ${formatKg(row.volume)} · ${row.sets} sets`;
+    item.appendChild(label);
+
+    const track = document.createElement("div");
+    track.className = "category-bar";
+    const fill = document.createElement("div");
+    fill.className = "category-bar-fill";
+    fill.style.width = `${max > 0 ? (row.volume / max) * 100 : 0}%`;
+    track.appendChild(fill);
+    item.appendChild(track);
+
+    wrap.appendChild(item);
+  });
+
+  return wrap;
 }
 
 async function renderBodyLogSection() {
