@@ -1,6 +1,7 @@
 import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
 import { volumeByWeek, volumeByCategory, percentChange } from "./volume-stats.js";
+import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 
 // Voortgang tab: body metrics (weight/waist/note) logged by date, plus local-only
 // progress photos. Entirely separate from sessions/sync — never touches
@@ -135,18 +136,10 @@ async function renderBodyLogSection() {
   dateInput.value = new Date().toISOString().slice(0, 10);
   form.appendChild(dateInput);
 
-  const weightInput = document.createElement("input");
-  weightInput.type = "number";
-  weightInput.step = "0.1";
-  weightInput.placeholder = "Gewicht (kg)";
-  weightInput.className = "body-log-weight";
+  const weightInput = makeDecimalInput("body-log-weight", "Gewicht (kg)");
   form.appendChild(weightInput);
 
-  const waistInput = document.createElement("input");
-  waistInput.type = "number";
-  waistInput.step = "0.5";
-  waistInput.placeholder = "Taille (cm)";
-  waistInput.className = "body-log-waist";
+  const waistInput = makeDecimalInput("body-log-waist", "Taille (cm)");
   form.appendChild(waistInput);
 
   const noteInput = document.createElement("textarea");
@@ -166,8 +159,8 @@ async function renderBodyLogSection() {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const weightKg = parseFloat(weightInput.value);
-    const waistCm = parseFloat(waistInput.value);
+    const weightKg = parseDecimal(weightInput.value);
+    const waistCm = parseDecimal(waistInput.value);
     if (Number.isNaN(weightKg) && Number.isNaN(waistCm)) {
       status.textContent = "Vul minstens gewicht of taille in voordat je opslaat.";
       return;

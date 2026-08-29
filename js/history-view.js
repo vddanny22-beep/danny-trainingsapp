@@ -1,6 +1,7 @@
 import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
 import { bestOneRepMax } from "./volume-stats.js";
+import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 
 // Renders the Geschiedenis tab: a session list (newest first) and a lightweight
 // per-exercise progress trend, built from the same session history storage.js
@@ -159,10 +160,7 @@ function renderSessionEditor(session, container) {
       label.textContent = `Set ${setIndex + 1}`;
       row.appendChild(label);
 
-      const weightInput = document.createElement("input");
-      weightInput.type = "number";
-      weightInput.step = "0.5";
-      weightInput.className = "weight-input";
+      const weightInput = makeDecimalInput("weight-input", "kg");
       weightInput.value = set.weight;
       row.appendChild(weightInput);
 
@@ -210,7 +208,7 @@ function renderSessionEditor(session, container) {
       const original = session.entries[Number(block.dataset.entryIndex)];
       const sets = [];
       block.querySelectorAll(".set-row").forEach((row) => {
-        const weight = parseFloat(row.querySelector(".weight-input").value);
+        const weight = parseDecimal(row.querySelector(".weight-input").value);
         const reps = parseInt(row.querySelector(".reps-input").value, 10);
         if (!Number.isNaN(weight) && !Number.isNaN(reps)) sets.push({ weight, reps });
       });

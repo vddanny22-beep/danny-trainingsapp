@@ -2,6 +2,7 @@ import * as storage from "./storage.js";
 import { hitTopOfRange, isLegDay, suggestNextWeight } from "./progression.js";
 import { startRestTimer, stopRestTimer } from "./rest-timer.js";
 import { loadDraft, saveDraft, clearDraft } from "./workout-draft.js";
+import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 
 export async function renderTodayView(container) {
   const days = await storage.getDays();
@@ -202,11 +203,7 @@ async function renderExerciseBlock(exercise, day) {
     setLabel.textContent = `Set ${i}`;
     setRow.appendChild(setLabel);
 
-    const weightInput = document.createElement("input");
-    weightInput.type = "number";
-    weightInput.step = "0.5";
-    weightInput.placeholder = "kg";
-    weightInput.className = "weight-input";
+    const weightInput = makeDecimalInput("weight-input", "kg");
     if (suggestedWeight != null) weightInput.value = suggestedWeight;
     setRow.appendChild(weightInput);
 
@@ -245,7 +242,7 @@ function buildSessionFromForm(form, day) {
   form.querySelectorAll(".exercise-block").forEach((block) => {
     const sets = [];
     block.querySelectorAll(".set-row").forEach((row) => {
-      const weight = parseFloat(row.querySelector(".weight-input").value);
+      const weight = parseDecimal(row.querySelector(".weight-input").value);
       const reps = parseInt(row.querySelector(".reps-input").value, 10);
       if (!Number.isNaN(weight) && !Number.isNaN(reps)) {
         sets.push({ weight, reps });
