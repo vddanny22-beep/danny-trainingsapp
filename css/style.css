@@ -794,3 +794,28 @@ h2 {
 .update-banner .btn-small {
   margin-left: 0;
 }
+
+.draft-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--bg-card-alt);
+}
+
+.draft-notice span {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.draft-notice .btn-small {
+  margin-left: 0;
+}
+
+.session-editor .inline-form-row {
+  margin-bottom: 10px;
+}

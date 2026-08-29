@@ -1,6 +1,7 @@
 import * as storage from "./storage.js";
 import { hitTopOfRange, isLegDay, suggestNextWeight } from "./progression.js";
 import { startRestTimer, stopRestTimer } from "./rest-timer.js";
+import { loadDraft, saveDraft, clearDraft } from "./workout-draft.js";
 
 export async function renderTodayView(container) {
   const days = await storage.getDays();
@@ -61,6 +62,18 @@ async function renderForDay(container, days, selectedDayId) {
   note.rows = 2;
   form.appendChild(note);
 
+  const draft = loadDraft(day.id);
+  if (draft) {
+    applyDraft(form, draft);
+    // The form is appended below, so appending here puts the notice directly
+    // above it, under the day picker.
+    container.appendChild(renderDraftNotice(container, days, day));
+  }
+
+  // Every keystroke, so nothing is lost however the tab goes away — a switch,
+  // a reload, or the phone killing the page between sets.
+  form.addEventListener("input", () => saveDraft(day.id, collectDraft(form)));
+
   const saveBtn = document.createElement("button");
   saveBtn.type = "submit";
   saveBtn.className = "btn btn-primary";
@@ -80,11 +93,72 @@ async function renderForDay(container, days, selectedDayId) {
     }
     await storage.saveSession(session);
     stopRestTimer(); // workout logged — no set left to rest between
+    clearDraft(); // it's a real session now, not something still in progress
     status.textContent = "Opgeslagen. Volgende keer suggereert de app het nieuwe gewicht.";
-    saveBtn.disabled = true;
+
+    // The old behaviour left a permanently dead button here: pressing save
+    // again would log a duplicate session, but there was also no way forward
+    // without switching tabs. Swapping the button gives an explicit next step
+    // and still can't double-submit.
+    const againBtn = document.createElement("button");
+    againBtn.type = "button";
+    againBtn.className = "btn btn-secondary";
+    againBtn.textContent = "Nog een training loggen";
+    againBtn.addEventListener("click", () => renderTodayView(container));
+    saveBtn.replaceWith(againBtn);
   });
 
   container.appendChild(form);
+}
+
+// Raw form contents, including half-filled rows — unlike buildSessionFromForm,
+// which drops anything incomplete. A draft has to keep exactly what's on
+// screen, including the set you're halfway through typing.
+function collectDraft(form) {
+  const sets = {};
+  form.querySelectorAll(".exercise-block").forEach((block) => {
+    sets[block.dataset.exerciseId] = [...block.querySelectorAll(".set-row")].map((row) => ({
+      weight: row.querySelector(".weight-input").value,
+      reps: row.querySelector(".reps-input").value,
+    }));
+  });
+  return { note: form.querySelector(".session-note-input").value, sets };
+}
+
+function applyDraft(form, draft) {
+  form.querySelectorAll(".exercise-block").forEach((block) => {
+    const saved = draft.sets[block.dataset.exerciseId];
+    if (!saved) return;
+    [...block.querySelectorAll(".set-row")].forEach((row, i) => {
+      if (!saved[i]) return;
+      // A blank saved weight means the user cleared the prefilled suggestion;
+      // restoring it as-is is what keeps the form exactly as they left it.
+      row.querySelector(".weight-input").value = saved[i].weight ?? "";
+      row.querySelector(".reps-input").value = saved[i].reps ?? "";
+    });
+  });
+  form.querySelector(".session-note-input").value = draft.note || "";
+}
+
+function renderDraftNotice(container, days, day) {
+  const notice = document.createElement("div");
+  notice.className = "draft-notice";
+
+  const text = document.createElement("span");
+  text.textContent = "Onafgemaakte training hersteld.";
+  notice.appendChild(text);
+
+  const discardBtn = document.createElement("button");
+  discardBtn.type = "button";
+  discardBtn.className = "btn btn-small";
+  discardBtn.textContent = "Leegmaken";
+  discardBtn.addEventListener("click", () => {
+    clearDraft();
+    renderForDay(container, days, day.id);
+  });
+  notice.appendChild(discardBtn);
+
+  return notice;
 }
 
 async function renderExerciseBlock(exercise, day) {

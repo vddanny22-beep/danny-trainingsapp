@@ -65,6 +65,7 @@ it with its own icon, launching full-screen like a real app.
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
 - `js/today-view.js` — the Vandaag tab: shows the next workout with last time's sets per exercise, logs a session (with an optional note)
 - `js/app-update.js` — offers a reload when the service worker has a new version waiting
+- `js/workout-draft.js` — keeps an in-progress workout in localStorage so leaving the tab (or the phone locking) doesn't lose what you typed
 - `js/rest-timer.js` — rest timer between sets (starts when a set's reps are filled in; duration set in the Schema tab). Holds a screen wake lock while resting and fires a notification at zero, so locking the phone mid-set doesn't swallow the alert
 - `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)
 - `js/backup.js` — full JSON backup/restore of schema, sessions, body metrics and photos
