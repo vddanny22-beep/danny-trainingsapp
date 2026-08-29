@@ -107,9 +107,40 @@ function renderSessionDetails(session) {
 // beyond the history list: today-view suggests the next weight from the most
 // recent entry for that exercise, so a stray "500" would otherwise skew every
 // future suggestion.
+// Local date parts, not toISOString().slice(0,10): the latter converts to UTC
+// first, so an evening session east of UTC would show as the next day.
+function toDateInputValue(date) {
+  const d = new Date(date);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Replaces the day but keeps the original time, so two sessions moved onto the
+// same date still sort in the order they were logged.
+function withDatePart(originalIso, dateInputValue) {
+  const [year, month, day] = dateInputValue.split("-").map(Number);
+  const next = new Date(originalIso);
+  next.setFullYear(year, month - 1, day);
+  return next.toISOString();
+}
+
 function renderSessionEditor(session, container) {
   const form = document.createElement("form");
   form.className = "session-editor";
+
+  // Forgetting to log on the day used to be unfixable: the session landed on
+  // whenever you got round to it, which quietly skewed the weekly volume.
+  const dateRow = document.createElement("label");
+  dateRow.className = "inline-form-row";
+  const dateCaption = document.createElement("span");
+  dateCaption.textContent = "Datum";
+  dateRow.appendChild(dateCaption);
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.className = "inline-form-input session-date-input";
+  dateInput.value = toDateInputValue(session.date);
+  dateRow.appendChild(dateInput);
+  form.appendChild(dateRow);
 
   session.entries.forEach((entry, entryIndex) => {
     const block = document.createElement("fieldset");
@@ -191,7 +222,12 @@ function renderSessionEditor(session, container) {
       return;
     }
 
-    await storage.saveSession({ ...session, entries, note: noteInput.value.trim() });
+    await storage.saveSession({
+      ...session,
+      entries,
+      note: noteInput.value.trim(),
+      date: dateInput.value ? withDatePart(session.date, dateInput.value) : session.date,
+    });
     renderHistoryView(container);
   });
 
