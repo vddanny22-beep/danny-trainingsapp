@@ -87,9 +87,15 @@ export async function renderChatView(container) {
     sendBtn.disabled = false;
 
     if (!result.ok) {
-      answerBubble.remove();
-      status.textContent = result.message;
-      status.classList.add("warn");
+      // Left in place instead of removed: silently vanishing gave no sign a
+      // message had failed, which is exactly what led to someone resending
+      // the same question several times over — every attempt looked like
+      // nothing had happened at all.
+      answerBubble.classList.add("chat-msg-error");
+      answerBubble.textContent = `⚠️ ${result.message}`;
+      status.textContent = "";
+      status.classList.remove("warn");
+      scrollToBottom(messageList);
       return;
     }
     status.textContent = "";
