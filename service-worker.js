@@ -1,4 +1,12 @@
-const CACHE_NAME = "trainingsapp-v13";
+// IMPORTANT: bump this on every deploy that changes any cached file's
+// content, even when APP_SHELL's file list is unchanged. The browser only
+// checks for a service worker update by byte-comparing this script against
+// the one it already has — it never looks at whether the files this script
+// lists have changed. Editing progress-view.js without bumping this leaves
+// this file byte-identical, so no update is ever detected and every
+// installed client keeps serving the stale cached copy forever, no matter
+// how many times they close and reopen the app.
+const CACHE_NAME = "trainingsapp-v14";
 const APP_SHELL = [
   "./",
   "./index.html",
