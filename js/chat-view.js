@@ -133,12 +133,12 @@ function renderApiKeySettings(rootContainer) {
   help.className = "sync-help";
   help.textContent = hasKey
     ? "API-key is ingesteld. Vul hieronder een nieuwe key in om te wijzigen."
-    : "Plak hier je Anthropic API-key (console.anthropic.com) om de AI Coach te gebruiken. De key wordt alleen lokaal op dit toestel bewaard en gaat rechtstreeks naar Anthropic — nooit via een eigen server.";
+    : "Plak hier je gratis Gemini API-key (aistudio.google.com, geen betaalpas nodig) om de AI Coach te gebruiken. De key wordt alleen lokaal op dit toestel bewaard en gaat rechtstreeks naar Google — nooit via een eigen server. Het gratis tier heeft een dag- en snelheidslimiet.";
   section.appendChild(help);
 
   const keyInput = document.createElement("input");
   keyInput.type = "password";
-  keyInput.placeholder = "sk-ant-...";
+  keyInput.placeholder = "AIzaSy...";
   keyInput.className = "sync-url-input";
   section.appendChild(keyInput);
 
