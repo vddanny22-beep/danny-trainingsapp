@@ -173,7 +173,25 @@ async function friendlyErrorMessage(response) {
   if (response.status === 429) {
     return "Daglimiet of snelheidslimiet van het gratis Gemini-tier bereikt. Probeer het over een minuut opnieuw, of morgen als de daglimiet op is.";
   }
+  if (response.status === 503) {
+    return "Het gratis Gemini-model is momenteel overbelast bij Google (niet aan deze app te wijten). Er is net automatisch opnieuw geprobeerd; probeer het anders over een minuutje nog eens.";
+  }
   return `AI-aanvraag mislukt (${response.status}). ${detail}`.trim();
+}
+
+// Free-tier Flash capacity spikes are common and usually resolve within
+// seconds, per Google's own "please try again later" wording on the 503 —
+// so one short retry before surfacing an error saves the user from having to
+// notice the failure and resend it themselves.
+const RETRY_DELAY_MS = 1500;
+
+async function postWithRetry(url, options) {
+  let response = await fetch(url, options);
+  if (response.status === 503) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    response = await fetch(url, options);
+  }
+  return response;
 }
 
 // `history` is an array of { role: "user"|"assistant", content: string },
@@ -190,7 +208,7 @@ export async function sendChatMessage(history, onDelta) {
 
   let response;
   try {
-    response = await fetch(`${API_BASE}/models/${MODEL}:streamGenerateContent?alt=sse`, {
+    response = await postWithRetry(`${API_BASE}/models/${MODEL}:streamGenerateContent?alt=sse`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
