@@ -185,12 +185,60 @@ async function friendlyErrorMessage(response) {
 // notice the failure and resend it themselves.
 const RETRY_DELAY_MS = 1500;
 
-async function postWithRetry(url, options) {
-  let response = await fetch(url, options);
+function buildRequestBody(history, userContext, { includeThinkingConfig }) {
+  const generationConfig = { maxOutputTokens: MAX_OUTPUT_TOKENS };
+  // Current Gemini Flash models think before answering by default, which adds
+  // a real multi-second delay before the first token even for a simple
+  // question like "how much protein do I need". Coaching chat doesn't need
+  // deep reasoning, so this trades some of that away for a faster reply.
+  if (includeThinkingConfig) generationConfig.thinkingConfig = { thinkingLevel: "low" };
+  return {
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT + userContext }] },
+    contents: toGeminiContents(history),
+    generationConfig,
+  };
+}
+
+function requestGemini(apiKey, body) {
+  return fetch(`${API_BASE}/models/${MODEL}:streamGenerateContent?alt=sse`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify(body),
+  });
+}
+
+// "thinkingLevel" is only understood by newer (Gemini 3-generation) models;
+// older ones (2.5-era) use a differently-shaped "thinkingBudget" field
+// instead and reject an unrecognized thinkingLevel outright. Since the
+// "-latest" alias can point at either generation depending on what Google
+// currently ships, this can't be hardcoded one way — it's detected from the
+// actual rejection and never surfaced to the user as if the API were broken.
+async function isRejectedThinkingConfig(response) {
+  if (response.status !== 400) return false;
+  let errBody;
+  try {
+    errBody = await response.clone().json();
+  } catch {
+    return false;
+  }
+  const message = (errBody?.error?.message || "").toLowerCase();
+  return errBody?.error?.status === "INVALID_ARGUMENT" && message.includes("thinking");
+}
+
+async function requestWithFallbacks(apiKey, history, userContext) {
+  let body = buildRequestBody(history, userContext, { includeThinkingConfig: true });
+  let response = await requestGemini(apiKey, body);
+
+  if (await isRejectedThinkingConfig(response)) {
+    body = buildRequestBody(history, userContext, { includeThinkingConfig: false });
+    response = await requestGemini(apiKey, body);
+  }
+
   if (response.status === 503) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    response = await fetch(url, options);
+    response = await requestGemini(apiKey, body);
   }
+
   return response;
 }
 
@@ -208,18 +256,7 @@ export async function sendChatMessage(history, onDelta) {
 
   let response;
   try {
-    response = await postWithRetry(`${API_BASE}/models/${MODEL}:streamGenerateContent?alt=sse`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT + userContext }] },
-        contents: toGeminiContents(history),
-        generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
-      }),
-    });
+    response = await requestWithFallbacks(apiKey, history, userContext);
   } catch (err) {
     return { ok: false, message: `Kon geen verbinding maken met de AI: ${err.message}` };
   }
