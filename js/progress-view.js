@@ -1,6 +1,6 @@
 import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
-import { volumeByWeek, volumeByCategory, percentChange } from "./volume-stats.js";
+import { volumeByWeek, volumeByCategory, percentChange, weeklyTrend } from "./volume-stats.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 
 // Voortgang tab: body metrics (weight/waist/note) logged by date, plus local-only
@@ -190,24 +190,11 @@ function renderTrends(logs) {
   wrap.className = "trend-section";
 
   const chronological = [...logs].reverse();
-  const weights = chronological.filter((l) => l.weightKg != null).map((l) => l.weightKg);
-  const waists = chronological.filter((l) => l.waistCm != null).map((l) => l.waistCm);
+  const weightPoints = chronological.filter((l) => l.weightKg != null).map((l) => ({ date: l.date, value: l.weightKg }));
+  const waistPoints = chronological.filter((l) => l.waistCm != null).map((l) => ({ date: l.date, value: l.waistCm }));
 
-  if (weights.length >= 2) {
-    const label = document.createElement("div");
-    label.className = "progress-label";
-    label.textContent = `Gewicht: ${weights[0]}kg → ${weights[weights.length - 1]}kg`;
-    wrap.appendChild(label);
-    wrap.appendChild(renderSparkline(weights));
-  }
-
-  if (waists.length >= 2) {
-    const label = document.createElement("div");
-    label.className = "progress-label";
-    label.textContent = `Taille: ${waists[0]}cm → ${waists[waists.length - 1]}cm`;
-    wrap.appendChild(label);
-    wrap.appendChild(renderSparkline(waists));
-  }
+  if (weightPoints.length >= 2) wrap.appendChild(renderMetricTrend("Gewicht", weightPoints, "kg"));
+  if (waistPoints.length >= 2) wrap.appendChild(renderMetricTrend("Taille", waistPoints, "cm"));
 
   if (!wrap.children.length) {
     const empty = document.createElement("p");
@@ -216,6 +203,41 @@ function renderTrends(logs) {
   }
 
   return wrap;
+}
+
+function formatSigned(value, unit) {
+  return `${value > 0 ? "+" : ""}${value}${unit}`;
+}
+
+function renderMetricTrend(label, points, unit) {
+  const box = document.createElement("div");
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  const heading = document.createElement("div");
+  heading.className = "progress-label";
+  heading.textContent = `${label}: ${first.value}${unit} → ${last.value}${unit}`;
+  box.appendChild(heading);
+
+  const trend = weeklyTrend(points);
+  // Rounded the same way weeklyTrend rounds its own total, so the fallback
+  // line can't show floating-point noise that the normal path never would.
+  const totalDelta = trend ? trend.total : Math.round((last.value - first.value) * 10) / 10;
+  const detail = document.createElement("div");
+  detail.className = "trend-rate";
+  detail.textContent = trend
+    ? `${formatSigned(totalDelta, unit)} totaal sinds ${formatShortDate(first.date)} · ${formatSigned(trend.perWeek, unit)}/week (over ${trend.weeks} weken)`
+    // Real, just not extrapolated: two measurements a day or two apart don't
+    // say anything reliable about a weekly rate.
+    : `${formatSigned(totalDelta, unit)} totaal sinds ${formatShortDate(first.date)}`;
+  box.appendChild(detail);
+
+  box.appendChild(renderSparkline(points.map((p) => p.value)));
+  return box;
+}
+
+function formatShortDate(date) {
+  return new Date(date).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function renderLogList(logs) {

@@ -124,3 +124,28 @@ export function percentChange(current, previous) {
   if (!(previous > 0)) return null;
   return Math.round(((current - previous) / previous) * 100);
 }
+
+// Below this many days apart, a "per week" rate is more noise than signal —
+// two measurements a day apart extrapolated to a week say almost nothing
+// about the actual trend. Returns null in that case rather than a wild number.
+const MIN_TREND_DAYS = 4;
+
+export function weeksBetween(startDate, endDate) {
+  const days = (new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24);
+  return days < MIN_TREND_DAYS ? null : days / 7;
+}
+
+// Average change per week between the first and last of a chronological
+// (oldest-first) series of { date, value } points. Null when there aren't
+// enough points or they're too close together in time to extrapolate from.
+export function weeklyTrend(points, decimals = 1) {
+  if (points.length < 2) return null;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const weeks = weeksBetween(first.date, last.date);
+  if (weeks === null) return null;
+  const factor = 10 ** decimals;
+  const total = Math.round((last.value - first.value) * factor) / factor;
+  const perWeek = Math.round((total / weeks) * factor) / factor;
+  return { total, perWeek, weeks: Math.round(weeks * 10) / 10 };
+}
