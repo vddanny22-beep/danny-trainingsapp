@@ -1,18 +1,24 @@
 import * as storage from "./storage.js";
 
-// AI Coach: calls the Anthropic API directly from the browser with a key the
+// AI Coach: calls the Gemini API directly from the browser with a key the
 // user pastes in themselves and which never leaves this device (localStorage
 // only). That's only reasonable because this is a single-user personal app —
-// see README.md. `anthropic-dangerous-direct-browser-access` is required for
-// any browser-origin call to the Messages API.
+// see README.md. Google's Generative Language API is designed for direct
+// client-side use like this, no special browser-access header required.
+//
+// Uses Gemini's free tier (Google AI Studio, no card needed) rather than a
+// paid Anthropic key, since that was the blocker for actually using this tab.
 
 const API_KEY_STORAGE_KEY = "trainingsapp.aiApiKey";
-const API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-opus-5";
-// Streaming removes the request-timeout pressure that kept this low, so the
-// ceiling is now only there to bound cost. The system prompt is what keeps
-// answers short; max_tokens only ever truncates mid-sentence.
-const MAX_TOKENS = 4096;
+const API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+// The "-latest" alias auto-follows Google's current Flash release rather than
+// a dated model ID, so this doesn't need updating every time a model is
+// deprecated (Flash/Flash-Lite are the models actually included in the free
+// tier; Pro is paid-only).
+const MODEL = "gemini-flash-latest";
+// The system prompt is what keeps answers short; this only bounds cost/keeps
+// a runaway response from truncating mid-sentence rather than shaping length.
+const MAX_OUTPUT_TOKENS = 4096;
 
 // Keeps the coach on-topic and safe: fitness/strength-training/nutrition
 // only, no medical diagnoses, grounded in the user's own schema, recent
@@ -131,6 +137,45 @@ async function* readServerSentEvents(body) {
   }
 }
 
+// Gemini's chat roles are "user" and "model" (not "assistant"), and history
+// storage/chat-view.js stay provider-agnostic, so the mapping happens only
+// here at the API boundary.
+function toGeminiContents(history) {
+  return history.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+}
+
+// A response can fail before any body streams (bad key, no quota) or partway
+// through (network drop, a safety block). Returns a friendly Dutch message
+// for the first case; the caller decides what to do with partial text in the
+// second.
+async function friendlyErrorMessage(response) {
+  let detail = "";
+  let status = "";
+  try {
+    const errBody = await response.json();
+    detail = errBody.error?.message || "";
+    status = errBody.error?.status || "";
+  } catch {
+    // response body wasn't JSON — ignore, fall back to the generic message below
+  }
+
+  // Gemini reports a bad key as 400 INVALID_ARGUMENT, not 401 — unlike most
+  // APIs, so the status code alone can't distinguish it from any other bad request.
+  if (response.status === 400 && (status === "INVALID_ARGUMENT" || /api key/i.test(detail))) {
+    return "Ongeldige API-key. Controleer je key bij AI Coach-instellingen.";
+  }
+  if (response.status === 403) {
+    return "Geen toegang met deze API-key. Controleer of de Gemini API voor deze key is ingeschakeld in Google AI Studio.";
+  }
+  if (response.status === 429) {
+    return "Daglimiet of snelheidslimiet van het gratis Gemini-tier bereikt. Probeer het over een minuut opnieuw, of morgen als de daglimiet op is.";
+  }
+  return `AI-aanvraag mislukt (${response.status}). ${detail}`.trim();
+}
+
 // `history` is an array of { role: "user"|"assistant", content: string },
 // oldest first. `onDelta` is called with the answer so far as it streams in.
 // Returns { ok: true, text } or { ok: false, message } — never throws, so
@@ -145,21 +190,16 @@ export async function sendChatMessage(history, onDelta) {
 
   let response;
   try {
-    response = await fetch(API_URL, {
+    response = await fetch(`${API_BASE}/models/${MODEL}:streamGenerateContent?alt=sse`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
+        "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: SYSTEM_PROMPT + userContext,
-        output_config: { effort: "medium" },
-        stream: true,
-        messages: history.map((m) => ({ role: m.role, content: m.content })),
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT + userContext }] },
+        contents: toGeminiContents(history),
+        generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
       }),
     });
   } catch (err) {
@@ -167,42 +207,27 @@ export async function sendChatMessage(history, onDelta) {
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
-      return { ok: false, message: "Ongeldige API-key. Controleer je key bij AI Coach-instellingen." };
-    }
-    if (response.status === 429) {
-      return { ok: false, message: "Te veel aanvragen bij de AI-provider. Probeer het zo weer." };
-    }
-    let detail = "";
-    try {
-      const errBody = await response.json();
-      detail = errBody.error?.message || "";
-    } catch {
-      // response body wasn't JSON — ignore, fall back to the generic message below
-    }
-    return { ok: false, message: `AI-aanvraag mislukt (${response.status}). ${detail}`.trim() };
+    return { ok: false, message: await friendlyErrorMessage(response) };
   }
-
   if (!response.body) {
     return { ok: false, message: "AI-aanvraag mislukt: geen antwoordstroom ontvangen." };
   }
 
   let text = "";
-  let stopReason = null;
-  let streamError = null;
+  let finishReason = null;
 
   try {
     for await (const event of readServerSentEvents(response.body)) {
-      if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
-        // Only text_delta: with adaptive thinking the stream also carries
-        // thinking deltas, which are not part of the answer.
-        text += event.delta.text;
-        onDelta?.(text);
-      } else if (event.type === "message_delta" && event.delta?.stop_reason) {
-        stopReason = event.delta.stop_reason;
-      } else if (event.type === "error") {
-        streamError = event.error?.message || "onbekende fout";
+      const candidate = event.candidates?.[0];
+      // Each chunk's text is new content, not the running total — Gemini
+      // streams deltas here, unlike its cumulative usageMetadata field.
+      for (const part of candidate?.content?.parts || []) {
+        if (part.text) {
+          text += part.text;
+          onDelta?.(text);
+        }
       }
+      if (candidate?.finishReason) finishReason = candidate.finishReason;
     }
   } catch (err) {
     // A connection dropped mid-answer still leaves usable text on screen;
@@ -212,10 +237,9 @@ export async function sendChatMessage(history, onDelta) {
     }
   }
 
-  if (streamError && !text) {
-    return { ok: false, message: `AI-aanvraag mislukt: ${streamError}` };
-  }
-  if (stopReason === "refusal") {
+  // SAFETY/RECITATION/PROHIBITED_CONTENT etc. — anything other than a normal
+  // stop or the (harmless) length cap counts as the model declining to answer.
+  if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
     return { ok: false, message: "De AI kon deze vraag niet beantwoorden." };
   }
   if (!text.trim()) {

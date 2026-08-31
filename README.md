@@ -70,7 +70,7 @@ it with its own icon, launching full-screen like a real app.
 - `js/history-view.js` — the Geschiedenis tab: past sessions (editable/deletable) + per-exercise progress (SVG sparklines)
 - `js/backup.js` — full JSON backup/restore of schema, sessions, body metrics and photos
 - `js/sheet-sync.js` — one-way sync (app → Sheet), calls the Apps Script Web App bridge
-- `js/ai-chat.js` — AI Coach: API key storage + the streaming call to the Anthropic API (parses the SSE response itself)
+- `js/ai-chat.js` — AI Coach: API key storage + the streaming call to the Gemini API (parses the SSE response itself)
 - `js/chat-view.js` — the AI Coach tab: chat UI, persists history to IndexedDB
 - `js/app.js` — wires everything together on page load
 - `sheet-sync/AppsScript.gs` — reference code Danny pastes into his Sheet's Apps Script editor to receive synced rows (one-time setup, instructions in the file's header comment)
@@ -88,15 +88,15 @@ it with its own icon, launching full-screen like a real app.
 The AI Coach tab answers questions about krachttraining, sporten, voeding en
 herstel, grounded in your own schema, your last 5 logged sessions and your
 last 5 body-metric entries (so it can spot stagnation, judge progression, or
-tune nutrition advice to your training volume). It calls the Anthropic API
+tune nutrition advice to your training volume). It calls the Gemini API
 directly from the browser — there's no backend, so this only works because
 it's a personal, single-user app:
 
-1. Get an API key at [console.anthropic.com](https://console.anthropic.com/) (this uses paid API credits, not a Claude.ai subscription).
+1. Get a free API key at [aistudio.google.com](https://aistudio.google.com/app/apikey) — no credit card needed, subject to the free tier's daily/rate limits (Flash-tier models only; see [ai.google.dev/gemini-api/docs](https://ai.google.dev/gemini-api/docs) for current limits).
 2. Open the AI Coach tab → paste the key under "AI Coach-instellingen" → Opslaan.
 3. The key is stored only in this browser's `localStorage` and is sent only to
-   `api.anthropic.com`. Chat history is stored only in this device's
-   IndexedDB. Neither is synced to the Sheet or anywhere else.
+   `generativelanguage.googleapis.com`. Chat history is stored only in this
+   device's IndexedDB. Neither is synced to the Sheet or anywhere else.
 
 The coach stays on-topic (fitness/training/voeding) and refuses medical
 diagnoses, deferring injury questions to a doctor or physio instead.
