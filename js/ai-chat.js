@@ -15,7 +15,12 @@ const API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 // a dated model ID, so this doesn't need updating every time a model is
 // deprecated (Flash/Flash-Lite are the models actually included in the free
 // tier; Pro is paid-only).
-const MODEL = "gemini-flash-latest";
+// Tried in order. Flash-Lite is the fallback, not the default: it's GA
+// (not preview) and gets ~50% more free-tier requests/minute than Flash, so
+// it typically has more spare capacity when Flash itself is overloaded —
+// worth a shot for a coaching chat that doesn't need Flash's extra
+// sophistication, rather than just failing outright.
+const MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"];
 // The system prompt is what keeps answers short; this only bounds cost/keeps
 // a runaway response from truncating mid-sentence rather than shaping length.
 const MAX_OUTPUT_TOKENS = 4096;
@@ -174,7 +179,7 @@ async function friendlyErrorMessage(response) {
     return "Daglimiet of snelheidslimiet van het gratis Gemini-tier bereikt. Probeer het over een minuut opnieuw, of morgen als de daglimiet op is.";
   }
   if (response.status === 503) {
-    return "Het gratis Gemini-model is momenteel overbelast bij Google (niet aan deze app te wijten). Er is net automatisch opnieuw geprobeerd; probeer het anders over een minuutje nog eens.";
+    return "De gratis Gemini-modellen zijn momenteel overbelast bij Google (niet aan deze app te wijten) — er is net automatisch een paar keer opnieuw geprobeerd, ook met een back-upmodel. Probeer het over een minuutje nog eens.";
   }
   return `AI-aanvraag mislukt (${response.status}). ${detail}`.trim();
 }
@@ -199,8 +204,8 @@ function buildRequestBody(history, userContext, { includeThinkingConfig }) {
   };
 }
 
-function requestGemini(apiKey, body) {
-  return fetch(`${API_BASE}/models/${MODEL}:streamGenerateContent?alt=sse`, {
+function requestGemini(apiKey, model, body) {
+  return fetch(`${API_BASE}/models/${model}:streamGenerateContent?alt=sse`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify(body),
@@ -225,20 +230,36 @@ async function isRejectedThinkingConfig(response) {
   return errBody?.error?.status === "INVALID_ARGUMENT" && message.includes("thinking");
 }
 
-async function requestWithFallbacks(apiKey, history, userContext) {
+// One model, with the thinkingConfig-compatibility fallback and a single
+// delayed retry on transient overload.
+async function requestModel(apiKey, model, history, userContext) {
   let body = buildRequestBody(history, userContext, { includeThinkingConfig: true });
-  let response = await requestGemini(apiKey, body);
+  let response = await requestGemini(apiKey, model, body);
 
   if (await isRejectedThinkingConfig(response)) {
     body = buildRequestBody(history, userContext, { includeThinkingConfig: false });
-    response = await requestGemini(apiKey, body);
+    response = await requestGemini(apiKey, model, body);
   }
 
   if (response.status === 503) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    response = await requestGemini(apiKey, body);
+    response = await requestGemini(apiKey, model, body);
   }
 
+  return response;
+}
+
+// Moves on to the next model in MODELS only when the current one is still
+// 503 after its own retry — a genuine capacity problem another model might
+// not have. Any other failure (bad key, 429, safety block, ...) applies
+// equally regardless of model, so retrying it against Flash-Lite would just
+// waste a second request and quota for the same outcome.
+async function requestWithFallbacks(apiKey, history, userContext) {
+  let response;
+  for (const model of MODELS) {
+    response = await requestModel(apiKey, model, history, userContext);
+    if (response.status !== 503) return response;
+  }
   return response;
 }
 
