@@ -619,6 +619,12 @@ h2 {
   color: var(--text-primary);
 }
 
+.trend-rate {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
 .body-log-list {
   list-style: none;
   padding: 0;
