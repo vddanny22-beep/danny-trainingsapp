@@ -110,6 +110,39 @@ body {
   padding-bottom: var(--safe-bottom);
 }
 
+/* Accent pill behind the active tab's icon. Moves with translateX(), sized
+   as one nav-btn's worth of width (100% / 5 tabs) so it lines up regardless
+   of viewport width, then centers a fixed-size pill inside that slot via
+   flexbox. z-index: -1 keeps it painted behind the (non-positioned) nav-btn
+   content instead of on top of the icon it's meant to sit behind. */
+.nav-indicator {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: calc(100% / 5);
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: -1;
+  transform: translateX(calc(100% * var(--nav-index, 0)));
+}
+
+.nav-indicator::after {
+  content: "";
+  width: 44px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: rgba(163, 230, 53, 0.15);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-indicator {
+    transition: transform var(--duration-base) var(--ease-standard);
+  }
+}
+
 .nav-btn {
   flex: 1;
   display: flex;
@@ -222,6 +255,63 @@ h2 {
   margin-top: 0;
 }
 
+/* Dashboard strip (Vandaag-tab), above the day picker: date + selected day
+   name plus a live "sets done / total" ring, so the tab reads as a summary
+   instead of opening straight on a bare <select>. */
+.today-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.today-hero-text {
+  min-width: 0;
+}
+
+.today-hero-date {
+  margin: 0 0 2px;
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.today-hero-day {
+  margin: 0;
+  font-size: var(--font-2xl);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.today-hero-ring {
+  flex: none;
+  width: 64px;
+  height: 64px;
+}
+
+.progress-ring-track {
+  stroke: var(--bg-card-alt);
+}
+
+.progress-ring-fill {
+  stroke: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .progress-ring-fill {
+    transition: stroke-dashoffset var(--duration-slow) var(--ease-standard);
+  }
+}
+
+.progress-ring-label {
+  fill: var(--text-primary);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
 .day-picker {
   width: 100%;
   padding: var(--space-3);
@@ -246,6 +336,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-sm);
 }
 
 .exercise-block legend {
@@ -297,6 +388,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--accent-text);
   width: 100%;
   margin-top: var(--space-2);
+  /* Pill shape sets the primary action apart from the rounded-rectangle
+     secondary/small buttons, so it reads as the one clear main action. */
+  border-radius: var(--radius-full);
 }
 
 .btn-secondary {
@@ -427,6 +521,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-sm);
 }
 
 .day-card-header {
@@ -499,6 +594,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-sm);
 }
 
 .session-summary {
@@ -551,6 +647,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-sm);
 }
 
 .progress-label {
@@ -626,6 +723,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-top: var(--space-4);
+  box-shadow: var(--shadow-sm);
 }
 
 .sync-help {
@@ -667,6 +765,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  box-shadow: var(--shadow-sm);
 }
 
 .body-log-date,
@@ -750,6 +849,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-2);
   text-align: center;
+  box-shadow: var(--shadow-sm);
 }
 
 .photo-thumb {
@@ -784,6 +884,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--radius-md);
   padding: var(--space-2);
   margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-sm);
 }
 
 .chat-messages {

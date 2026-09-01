@@ -13,6 +13,7 @@ const navHistory = document.getElementById("nav-history");
 const navSchema = document.getElementById("nav-schema");
 const navProgress = document.getElementById("nav-progress");
 const navChat = document.getElementById("nav-chat");
+const navIndicator = document.querySelector(".nav-indicator");
 
 const TABS = {
   today: { button: navToday, render: renderTodayView },
@@ -21,6 +22,10 @@ const TABS = {
   progress: { button: navProgress, render: renderProgressView },
   chat: { button: navChat, render: renderChatView },
 };
+
+// Order matters here: it's how the moving nav-indicator pill maps a button to
+// a horizontal slot (index 0..4 of 5 equal-width tabs).
+const NAV_BUTTONS = [navToday, navHistory, navSchema, navProgress, navChat];
 
 // Each tab keeps its own scroll offset, restored when you switch back to it —
 // without this, returning to a tab always dropped you back at the top even
@@ -66,8 +71,11 @@ async function switchTab(name) {
 }
 
 function setActiveNav(button) {
-  [navToday, navHistory, navSchema, navProgress, navChat].forEach((b) => b.classList.remove("active"));
+  NAV_BUTTONS.forEach((b) => b.classList.remove("active"));
   button.classList.add("active");
+
+  const index = NAV_BUTTONS.indexOf(button);
+  if (navIndicator && index !== -1) navIndicator.style.setProperty("--nav-index", index);
 }
 
 async function seedIfEmpty() {

@@ -4,6 +4,7 @@ import { startRestTimer, stopRestTimer } from "./rest-timer.js";
 import { loadDraft, saveDraft, clearDraft } from "./workout-draft.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { showToast } from "./ui-toast.js";
+import { renderProgressRing, updateProgressRing } from "./progress-ring.js";
 
 export async function renderTodayView(container) {
   const days = await storage.getDays();
@@ -24,13 +25,67 @@ async function pickDefaultDay(days) {
   return days[(lastIndex + 1) % days.length];
 }
 
+// Dashboard strip shown above the day picker: today's date, the selected
+// day's name, and a live progress ring for "sets completed / total sets".
+// Purely presentational — totalSets/completed are just counts of what the
+// form below already tracks, no new training logic.
+function renderHero(day, totalSets) {
+  const hero = document.createElement("div");
+  hero.className = "today-hero";
+
+  const text = document.createElement("div");
+  text.className = "today-hero-text";
+
+  const date = document.createElement("p");
+  date.className = "today-hero-date";
+  date.textContent = formatHeroDate(new Date());
+  text.appendChild(date);
+
+  const dayName = document.createElement("h2");
+  dayName.className = "today-hero-day";
+  dayName.textContent = day.name;
+  text.appendChild(dayName);
+
+  hero.appendChild(text);
+
+  const ringSvg = renderProgressRing(0, totalSets ? `0/${totalSets}` : "–");
+  ringSvg.classList.add("today-hero-ring");
+  hero.appendChild(ringSvg);
+
+  return { hero, ringSvg };
+}
+
+function formatHeroDate(date) {
+  return date.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+}
+
+// Recomputes "sets completed" straight from the form's current inputs (same
+// weight/reps validity check buildSessionFromForm uses to decide what counts
+// as a real set) and pushes it into the already-mounted ring.
+function refreshProgressRing(ringSvg, form, totalSets) {
+  const completed = [...form.querySelectorAll(".set-row")].filter((row) => parseSetRow(row) !== null).length;
+  const fraction = totalSets ? completed / totalSets : 0;
+  updateProgressRing(ringSvg, fraction, totalSets ? `${completed}/${totalSets}` : "–");
+}
+
+// A set only "counts" once both weight and reps parse to real numbers. Shared
+// by the ring above and buildSessionFromForm below, so "completed" always
+// means the same thing whether it's driving the dashboard or deciding what
+// gets saved.
+function parseSetRow(row) {
+  const weight = parseDecimal(row.querySelector(".weight-input").value);
+  const reps = parseInt(row.querySelector(".reps-input").value, 10);
+  if (Number.isNaN(weight) || Number.isNaN(reps)) return null;
+  return { weight, reps };
+}
+
 async function renderForDay(container, days, selectedDayId) {
   const day = days.find((d) => d.id === selectedDayId) || days[0];
   container.innerHTML = "";
 
-  const heading = document.createElement("h2");
-  heading.textContent = "Vandaag";
-  container.appendChild(heading);
+  const totalSets = day.exercises.reduce((sum, ex) => sum + ex.sets, 0);
+  const { hero, ringSvg } = renderHero(day, totalSets);
+  container.appendChild(hero);
 
   const picker = document.createElement("select");
   picker.className = "day-picker";
@@ -72,9 +127,18 @@ async function renderForDay(container, days, selectedDayId) {
     container.appendChild(renderDraftNotice(container, days, day));
   }
 
+  // Ring starts reflecting whatever was just restored from the draft (or
+  // stays at 0/total on a fresh form), not just future keystrokes.
+  refreshProgressRing(ringSvg, form, totalSets);
+
   // Every keystroke, so nothing is lost however the tab goes away — a switch,
-  // a reload, or the phone killing the page between sets.
-  form.addEventListener("input", () => saveDraft(day.id, collectDraft(form)));
+  // a reload, or the phone killing the page between sets. The same listener
+  // also drives the dashboard ring, so filling in a set updates both without
+  // a second "input" subscription on the form.
+  form.addEventListener("input", () => {
+    saveDraft(day.id, collectDraft(form));
+    refreshProgressRing(ringSvg, form, totalSets);
+  });
 
   const saveBtn = document.createElement("button");
   saveBtn.type = "submit";
@@ -245,11 +309,8 @@ function buildSessionFromForm(form, day) {
   form.querySelectorAll(".exercise-block").forEach((block) => {
     const sets = [];
     block.querySelectorAll(".set-row").forEach((row) => {
-      const weight = parseDecimal(row.querySelector(".weight-input").value);
-      const reps = parseInt(row.querySelector(".reps-input").value, 10);
-      if (!Number.isNaN(weight) && !Number.isNaN(reps)) {
-        sets.push({ weight, reps });
-      }
+      const parsed = parseSetRow(row);
+      if (parsed) sets.push(parsed);
     });
     if (sets.length) {
       entries.push({
