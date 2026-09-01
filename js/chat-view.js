@@ -1,5 +1,7 @@
 import * as storage from "./storage.js";
 import { getApiKey, setApiKey, sendChatMessage } from "./ai-chat.js";
+import { confirmDialog } from "./ui-dialog.js";
+import { showToast } from "./ui-toast.js";
 
 // Coach tab: a chat UI for the AI coach, scoped to sports/krachttraining,
 // fitness and voeding (see the system prompt in ai-chat.js). Full history is
@@ -118,8 +120,16 @@ export async function renderChatView(container) {
   clearBtn.className = "btn btn-secondary btn-danger";
   clearBtn.textContent = "Gesprek wissen";
   clearBtn.addEventListener("click", async () => {
-    if (!confirm("Hele gesprek met de AI Coach verwijderen?")) return;
+    const confirmed = await confirmDialog({
+      title: "Gesprek wissen",
+      body: "Hele gesprek met de AI Coach verwijderen?",
+      confirmLabel: "Wissen",
+      danger: true,
+    });
+    if (!confirmed) return;
+    navigator.vibrate?.(20);
     await storage.clearChatMessages();
+    showToast("Gesprek gewist");
     renderChatView(container);
   });
   container.appendChild(clearBtn);

@@ -2,6 +2,8 @@ import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
 import { bestOneRepMax } from "./volume-stats.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
+import { confirmDialog } from "./ui-dialog.js";
+import { showToast } from "./ui-toast.js";
 
 // Renders the Geschiedenis tab: a session list (newest first) and a lightweight
 // per-exercise progress trend, built from the same session history storage.js
@@ -66,8 +68,16 @@ function renderSessionItem(session, container) {
   header.appendChild(editBtn);
 
   const deleteBtn = smallButton("Verwijderen", async () => {
-    if (!confirm(`Sessie van ${formatSessionDate(session)} (${session.dayName}) verwijderen?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Sessie verwijderen",
+      body: `Sessie van ${formatSessionDate(session)} (${session.dayName}) verwijderen?`,
+      confirmLabel: "Verwijderen",
+      danger: true,
+    });
+    if (!confirmed) return;
+    navigator.vibrate?.(20);
     await storage.deleteSession(session.id);
+    showToast("Sessie verwijderd");
     renderHistoryView(container);
   });
   deleteBtn.classList.add("btn-danger");
