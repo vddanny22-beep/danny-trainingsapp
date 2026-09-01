@@ -5,6 +5,8 @@ import {
   notificationsSupported, notificationsEnabled, notificationsBlocked, requestNotificationPermission,
 } from "./rest-timer.js";
 import { downloadBackup, restoreBackupFromFile } from "./backup.js";
+import { confirmDialog } from "./ui-dialog.js";
+import { showToast } from "./ui-toast.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -92,8 +94,18 @@ function renderBackupSettings() {
   importBtn.type = "button";
   importBtn.className = "btn btn-secondary btn-danger";
   importBtn.textContent = "Back-up terugzetten";
-  importBtn.addEventListener("click", () => {
-    if (!confirm("Terugzetten vervangt je huidige schema, sessies, metingen en foto's door die uit het back-upbestand. Doorgaan?")) return;
+  importBtn.addEventListener("click", async () => {
+    // Highest-stakes confirmation in the app — it replaces everything on the
+    // device — so it gets the danger styling, and confirmDialog's default
+    // focus on the cancel button (never the destructive one) matters most
+    // right here.
+    const confirmed = await confirmDialog({
+      title: "Back-up terugzetten",
+      body: "Terugzetten vervangt je huidige schema, sessies, metingen en foto's door die uit het back-upbestand. Doorgaan?",
+      confirmLabel: "Terugzetten",
+      danger: true,
+    });
+    if (!confirmed) return;
     fileInput.click();
   });
   section.appendChild(importBtn);
@@ -321,8 +333,16 @@ function renderDayCard(day, rootContainer, days, index) {
   actions.appendChild(renameBtn);
 
   const deleteDayBtn = smallButton("Dag verwijderen", async () => {
-    if (!confirm(`"${day.name}" verwijderen, inclusief alle oefeningen?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Dag verwijderen",
+      body: `"${day.name}" verwijderen, inclusief alle oefeningen?`,
+      confirmLabel: "Verwijderen",
+      danger: true,
+    });
+    if (!confirmed) return;
+    navigator.vibrate?.(20);
     await storage.deleteDay(day.id);
+    showToast("Dag verwijderd");
     renderSchemaEditor(rootContainer);
   });
   deleteDayBtn.classList.add("btn-danger");
@@ -390,9 +410,17 @@ function renderExerciseRow(day, exercise, rootContainer, index) {
   actions.appendChild(editBtn);
 
   const deleteBtn = smallButton("Verwijderen", async () => {
-    if (!confirm(`"${exercise.name}" verwijderen?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Oefening verwijderen",
+      body: `"${exercise.name}" verwijderen?`,
+      confirmLabel: "Verwijderen",
+      danger: true,
+    });
+    if (!confirmed) return;
+    navigator.vibrate?.(20);
     const updatedExercises = day.exercises.filter((e) => e.id !== exercise.id);
     await storage.saveDay({ ...day, exercises: updatedExercises });
+    showToast("Oefening verwijderd");
     renderSchemaEditor(rootContainer);
   });
   deleteBtn.classList.add("btn-danger");

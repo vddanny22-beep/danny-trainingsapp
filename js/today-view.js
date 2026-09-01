@@ -3,6 +3,7 @@ import { hitTopOfRange, isLegDay, suggestNextWeight } from "./progression.js";
 import { startRestTimer, stopRestTimer } from "./rest-timer.js";
 import { loadDraft, saveDraft, clearDraft } from "./workout-draft.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
+import { showToast } from "./ui-toast.js";
 
 export async function renderTodayView(container) {
   const days = await storage.getDays();
@@ -95,7 +96,9 @@ async function renderForDay(container, days, selectedDayId) {
     await storage.saveSession(session);
     stopRestTimer(); // workout logged — no set left to rest between
     clearDraft(); // it's a real session now, not something still in progress
+    navigator.vibrate?.(20);
     status.textContent = "Opgeslagen. Volgende keer suggereert de app het nieuwe gewicht.";
+    showToast("Sessie opgeslagen");
 
     // The old behaviour left a permanently dead button here: pressing save
     // again would log a duplicate session, but there was also no way forward

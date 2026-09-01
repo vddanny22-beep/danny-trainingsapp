@@ -13,6 +13,45 @@
      same rules work in a desktop browser and on a phone. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Spacing scale (4/8/12/16/24/32) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Type scale */
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-base: 15px;
+  --font-md: 16px;
+  --font-lg: 18px;
+  --font-xl: 22px;
+  --font-2xl: 28px;
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Radius scale */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Focus ring, derived from --accent */
+  --focus-ring: 0 0 0 3px rgba(163, 230, 53, 0.35);
 }
 
 * {
@@ -30,22 +69,31 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Keyboard focus, everywhere. Without this, Chrome's raw orange default
+   outline shows on any focused control, clashing with the lime accent used
+   for everything else. :focus-visible (not :focus) so it only shows for
+   keyboard/assistive-tech focus, never on a plain mouse/touch tap. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .app-header {
   position: sticky;
   top: 0;
   z-index: 10;
   background: var(--bg-card);
   color: var(--text-primary);
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   /* The status bar is translucent in standalone mode, so the header has to
      reserve its height itself or the title sits under the clock. */
-  padding-top: calc(12px + var(--safe-top));
+  padding-top: calc(var(--space-3) + var(--safe-top));
   border-bottom: 1px solid var(--border);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--font-lg);
   color: var(--accent);
   letter-spacing: -0.02em;
 }
@@ -75,7 +123,7 @@ body {
   background: none;
   font-family: inherit;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--text-secondary);
   cursor: pointer;
   transition: color 0.15s ease;
@@ -100,10 +148,10 @@ body {
 }
 
 #content {
-  padding: 16px;
+  padding: var(--space-4);
   max-width: 640px;
   margin: 0 auto;
-  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px);
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + var(--space-5));
 }
 
 /* Rusttimer tussen sets */
@@ -139,19 +187,19 @@ body {
   gap: 10px;
   max-width: 640px;
   margin: 0 auto;
-  padding: 10px 16px;
+  padding: 10px var(--space-4);
 }
 
 .rest-timer-label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
   color: var(--text-secondary);
 }
 
 .rest-timer-time {
   flex: 1;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: var(--font-xl);
+  font-weight: var(--fw-bold);
   /* Equal-width digits stop the countdown jittering as numbers change. */
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -176,48 +224,55 @@ h2 {
 
 .day-picker {
   width: 100%;
-  padding: 12px;
-  font-size: 16px;
-  margin-bottom: 16px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  font-size: var(--font-md);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
 }
 
+/* Dark-theme-consistent calendar icon: the OS-default glyph is plain
+   white/dark and clashes with the app's own palette otherwise. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
 .exercise-block {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .exercise-block legend {
-  font-weight: 600;
-  padding: 0 4px;
+  font-weight: var(--fw-semibold);
+  padding: 0 var(--space-1);
   color: var(--text-primary);
 }
 
 .suggested-weight {
   color: var(--accent);
   font-size: 14px;
-  font-weight: 600;
-  margin: 4px 0 12px;
+  font-weight: var(--fw-semibold);
+  margin: var(--space-1) 0 var(--space-3);
 }
 
 .set-row {
   display: grid;
   grid-template-columns: 60px 1fr 1fr;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .set-row input {
-  padding: 12px;
-  font-size: 16px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  font-size: var(--font-md);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card-alt);
   color: var(--text-primary);
@@ -229,9 +284,9 @@ h2 {
 }
 
 .btn {
-  padding: 14px 16px;
-  font-size: 16px;
-  font-weight: 600;
+  padding: 14px var(--space-4);
+  font-size: var(--font-md);
+  font-weight: var(--fw-semibold);
   border-radius: 10px;
   border: none;
   cursor: pointer;
@@ -241,7 +296,7 @@ h2 {
   background: var(--accent);
   color: var(--accent-text);
   width: 100%;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .btn-secondary {
@@ -249,12 +304,12 @@ h2 {
   color: var(--accent);
   border: 1px solid var(--accent);
   width: 100%;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .btn-small {
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: var(--space-2) 10px;
+  font-size: var(--font-sm);
   border-radius: 6px;
   background: var(--bg-card-alt);
   color: var(--text-primary);
@@ -273,14 +328,38 @@ h2 {
   border-color: var(--accent);
 }
 
+/* Press feedback. Only .nav-btn had this before; every other button just sat
+   there static on tap, which read as unresponsive on a touchscreen. The
+   opacity dip applies regardless of motion preference; the scale — the part
+   that actually "moves" — is gated below. */
+.btn:active,
+.btn-primary:active,
+.btn-small:active,
+.btn-danger:active,
+.btn-accent:active,
+.photo-file-input::file-selector-button:active {
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn:active,
+  .btn-primary:active,
+  .btn-small:active,
+  .btn-danger:active,
+  .btn-accent:active,
+  .photo-file-input::file-selector-button:active {
+    transform: scale(0.97);
+  }
+}
+
 /* Inline formulieren (Schema-tab) */
 
 .inline-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid var(--accent);
   border-radius: 10px;
   background: var(--bg-card-alt);
@@ -290,12 +369,12 @@ h2 {
   display: grid;
   grid-template-columns: 92px 1fr;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .inline-form-row span {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
   color: var(--text-secondary);
 }
 
@@ -303,9 +382,9 @@ h2 {
   width: 100%;
   padding: 10px;
   /* 16px keeps iOS from zooming the page in when the field takes focus. */
-  font-size: 16px;
+  font-size: var(--font-md);
   font-family: inherit;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
@@ -313,7 +392,7 @@ h2 {
 
 .inline-form-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .inline-form-actions .btn {
@@ -323,8 +402,8 @@ h2 {
 
 .inline-form-error {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
   color: var(--danger);
 }
 
@@ -339,22 +418,22 @@ h2 {
 
 .save-status {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .day-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .day-card-header {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .day-card-header h3 {
@@ -366,7 +445,7 @@ h2 {
 .exercise-list {
   list-style: none;
   padding: 0;
-  margin: 12px 0;
+  margin: var(--space-3) 0;
 }
 
 /* Name on its own line with the buttons beneath it: four actions per row
@@ -376,7 +455,7 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
@@ -398,7 +477,7 @@ h2 {
 /* Fixed width so the arrows line up column-wise down the list. */
 .btn-move {
   width: 34px;
-  padding: 8px 0;
+  padding: var(--space-2) 0;
   text-align: center;
 }
 
@@ -411,19 +490,19 @@ h2 {
 .session-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 24px;
+  margin: 0 0 var(--space-5);
 }
 
 .session-item {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .session-summary {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin-bottom: 6px;
   color: var(--text-primary);
 }
@@ -432,7 +511,7 @@ h2 {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .session-item-header .session-summary {
@@ -463,25 +542,25 @@ h2 {
 }
 
 .progress-list {
-  margin-bottom: 24px;
+  margin-bottom: var(--space-5);
 }
 
 .progress-row {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .progress-label {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin-bottom: 6px;
   color: var(--text-primary);
 }
 
 .progress-sublabel {
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   margin-bottom: 6px;
 }
@@ -495,9 +574,9 @@ h2 {
 /* Trainingsvolume (Voortgang tab) */
 
 .volume-delta {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .volume-delta.up {
@@ -509,7 +588,7 @@ h2 {
 }
 
 .category-breakdown {
-  margin-top: 16px;
+  margin-top: var(--space-4);
 }
 
 .category-row {
@@ -517,9 +596,9 @@ h2 {
 }
 
 .category-row-label {
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .category-bar {
@@ -544,31 +623,31 @@ h2 {
 .sync-settings {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .sync-help {
   color: var(--text-secondary);
-  font-size: 13px;
-  margin: 4px 0 12px;
+  font-size: var(--font-sm);
+  margin: var(--space-1) 0 var(--space-3);
 }
 
 .sync-url-input {
   width: 100%;
-  padding: 12px;
-  font-size: 15px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  font-size: var(--font-base);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card-alt);
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .sync-status {
-  margin-top: 8px;
-  font-weight: 600;
+  margin-top: var(--space-2);
+  font-weight: var(--fw-semibold);
   color: var(--accent);
 }
 
@@ -582,12 +661,12 @@ h2 {
 .photo-form {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .body-log-date,
@@ -597,9 +676,9 @@ h2 {
 .photo-file-input,
 .photo-label-input {
   width: 100%;
-  padding: 12px;
-  font-size: 16px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  font-size: var(--font-md);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card-alt);
   color: var(--text-primary);
@@ -611,8 +690,28 @@ h2 {
   min-height: 60px;
 }
 
+/* Unstyled native file input otherwise shows the raw OS-language "Choose
+   File" button, which stands out inside an otherwise Dutch, dark-themed
+   form. Restyled to match the app's own small buttons. */
+.photo-file-input {
+  padding: var(--space-2);
+}
+
+.photo-file-input::file-selector-button {
+  padding: var(--space-2) 10px;
+  margin-right: var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--bg-card);
+  color: var(--accent);
+  cursor: pointer;
+}
+
 .trend-section {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .trend-section .progress-label {
@@ -620,7 +719,7 @@ h2 {
 }
 
 .trend-rate {
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   margin-bottom: 6px;
 }
@@ -628,28 +727,28 @@ h2 {
 .body-log-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 24px;
+  margin: 0 0 var(--space-5);
 }
 
 .body-log-item {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .photo-gallery {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .photo-cell {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px;
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
   text-align: center;
 }
 
@@ -657,7 +756,7 @@ h2 {
   width: 100%;
   height: 140px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: block;
 }
@@ -673,7 +772,7 @@ h2 {
 
 .photo-cell-label {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
@@ -682,25 +781,25 @@ h2 {
 .chat-box {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .chat-messages {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   max-height: 55vh;
   overflow-y: auto;
-  padding: 4px;
+  padding: var(--space-1);
 }
 
 .chat-msg {
   max-width: 85%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 15px;
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-base);
   line-height: 1.4;
   white-space: pre-wrap;
 }
@@ -728,14 +827,14 @@ h2 {
 .chat-input-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .chat-input {
   width: 100%;
-  padding: 12px;
-  font-size: 16px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  font-size: var(--font-md);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card-alt);
   color: var(--text-primary);
@@ -744,36 +843,36 @@ h2 {
 }
 
 .notification-setting {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
 
 .previous-sets {
-  margin: 0 0 12px;
-  font-size: 13px;
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .session-note-input {
   width: 100%;
-  padding: 12px;
-  font-size: 16px;
+  padding: var(--space-3);
+  font-size: var(--font-md);
   font-family: inherit;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card-alt);
   color: var(--text-primary);
   resize: vertical;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .session-note {
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
   padding-left: 10px;
   border-left: 2px solid var(--border);
-  font-size: 13px;
+  font-size: var(--font-sm);
   font-style: italic;
   color: var(--text-secondary);
 }
@@ -790,8 +889,8 @@ h2 {
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: var(--space-2);
+  padding: 10px var(--space-4);
   padding-top: calc(10px + var(--safe-top));
   background: var(--bg-card-alt);
   border-bottom: 1px solid var(--accent);
@@ -800,7 +899,7 @@ h2 {
 .update-banner span {
   flex: 1;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .update-banner .btn-small {
@@ -810,9 +909,9 @@ h2 {
 .draft-notice {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: 10px var(--space-3);
   border: 1px solid var(--accent);
   border-radius: 10px;
   background: var(--bg-card-alt);
@@ -820,8 +919,8 @@ h2 {
 
 .draft-notice span {
   flex: 1;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
 }
 
 .draft-notice .btn-small {
@@ -830,4 +929,168 @@ h2 {
 
 .session-editor .inline-form-row {
   margin-bottom: 10px;
+}
+
+/* Tab-switch cross-fade. Guarded so the browsers that don't support the View
+   Transitions API simply never define these pseudo-elements — no fallback
+   branch needed here, since document.startViewTransition itself is
+   feature-detected in js/app.js before it's ever called. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: var(--duration-base);
+    animation-timing-function: var(--ease-standard);
+  }
+
+  ::view-transition-old(root) {
+    animation-name: view-transition-fade-out;
+  }
+
+  ::view-transition-new(root) {
+    animation-name: view-transition-fade-in;
+  }
+
+  @keyframes view-transition-fade-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes view-transition-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Custom confirm dialog (js/ui-dialog.js), replacing window.confirm(). Built
+   as a bottom sheet on mobile — sliding up from the tab bar reads as native,
+   where a centered modal would feel like a desktop leftover. */
+.ui-dialog {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4) calc(var(--space-5) + var(--safe-bottom));
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.ui-dialog-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-lg);
+  font-weight: var(--fw-bold);
+}
+
+.ui-dialog-body {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+}
+
+/* Stacked in DOM order — cancel (the default-focused, safe action) first,
+   confirm below it — so the visual order matches tab order and there's no
+   mismatch between what's focused and what's on top. */
+.ui-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-dialog-actions .btn {
+  margin-top: 0;
+}
+
+.ui-dialog-confirm-danger {
+  background: var(--danger);
+  color: var(--bg-page);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-dialog {
+    animation: ui-dialog-slide-up var(--duration-base) var(--ease-standard);
+  }
+
+  .ui-dialog::backdrop {
+    animation: ui-dialog-backdrop-fade var(--duration-base) var(--ease-standard);
+  }
+
+  @keyframes ui-dialog-slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes ui-dialog-backdrop-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Toast/snackbar (js/ui-toast.js). Positioned like .rest-timer, just above
+   the tab bar — an additive visual confirmation layered on top of the
+   existing inline .save-status text, not a replacement for it. */
+.ui-toast {
+  position: fixed;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + var(--space-3));
+  z-index: 50;
+  max-width: 560px;
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard);
+}
+
+.ui-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-toast {
+    transition: opacity var(--duration-fast) linear;
+    transform: none;
+  }
 }
