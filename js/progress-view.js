@@ -14,9 +14,71 @@ export async function renderProgressView(container) {
   heading.textContent = "Voortgang";
   container.appendChild(heading);
 
+  const logs = await storage.getBodyLogs();
+  const statRow = renderStatRow(logs);
+  if (statRow) container.appendChild(statRow);
+
+  container.appendChild(await renderBodyLogSection(container, logs));
+  container.appendChild(await renderPhotoSection(container));
   container.appendChild(await renderVolumeSection());
-  container.appendChild(await renderBodyLogSection());
-  container.appendChild(await renderPhotoSection());
+}
+
+// Chronological (oldest-first) {date, value} points for one metric — shared
+// by the headline stat cards above and the trend charts further down, so
+// both always agree on what counts as a measurement for that metric.
+function metricPoints(logs, key) {
+  return [...logs].reverse().filter((l) => l[key] != null).map((l) => ({ date: l.date, value: l[key] }));
+}
+
+// Two big-number cards (latest weight/waist + change since the first log in
+// range) above everything else, so the tab opens on "where am I now" instead
+// of a form. Omitted entirely until there's at least one measurement to show.
+function renderStatRow(logs) {
+  const cards = [renderStatCard("Gewicht", metricPoints(logs, "weightKg"), "kg"), renderStatCard("Taille", metricPoints(logs, "waistCm"), "cm")].filter(
+    Boolean
+  );
+  if (!cards.length) return null;
+
+  const row = document.createElement("div");
+  row.className = "stat-row";
+  cards.forEach((card) => row.appendChild(card));
+  return row;
+}
+
+function renderStatCard(label, points, unit) {
+  if (!points.length) return null;
+  const last = points[points.length - 1];
+
+  const card = document.createElement("div");
+  card.className = "stat-card";
+
+  const labelEl = document.createElement("p");
+  labelEl.className = "stat-card-label";
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  const valueEl = document.createElement("p");
+  valueEl.className = "stat-card-value";
+  valueEl.append(String(last.value));
+  const unitEl = document.createElement("span");
+  unitEl.className = "stat-card-unit";
+  unitEl.textContent = ` ${unit}`;
+  valueEl.appendChild(unitEl);
+  card.appendChild(valueEl);
+
+  if (points.length >= 2) {
+    const first = points[0];
+    const trend = weeklyTrend(points);
+    // Same rounding weeklyTrend applies to its own total, so the fallback
+    // can't show floating-point noise the normal path never would.
+    const totalDelta = trend ? trend.total : Math.round((last.value - first.value) * 10) / 10;
+    const deltaEl = document.createElement("p");
+    deltaEl.className = "stat-card-delta";
+    deltaEl.textContent = `${formatSigned(totalDelta, unit)} sinds ${formatShortDate(first.date)}`;
+    card.appendChild(deltaEl);
+  }
+
+  return card;
 }
 
 const WEEKS_SHOWN = 12;
@@ -68,7 +130,7 @@ async function renderVolumeSection() {
   caption.className = "sync-help";
   caption.textContent = `Volume per week, laatste ${WEEKS_SHOWN} weken (gewicht × reps, alle sets bij elkaar).`;
   section.appendChild(caption);
-  section.appendChild(renderSparkline(weeks.map((week) => week.volume)));
+  section.appendChild(renderSparkline(weeks.map((week) => week.volume), { area: true }));
 
   section.appendChild(renderCategoryBreakdown(sessions));
   return section;
@@ -120,7 +182,7 @@ function renderCategoryBreakdown(sessions) {
   return wrap;
 }
 
-async function renderBodyLogSection() {
+async function renderBodyLogSection(rootContainer, logs) {
   const section = document.createElement("section");
 
   const formHeading = document.createElement("h3");
@@ -173,12 +235,12 @@ async function renderBodyLogSection() {
       note: noteInput.value.trim(),
     });
     status.textContent = "Opgeslagen.";
-    section.replaceWith(await renderBodyLogSection());
+    // Full re-render, not just this section: a new log can change the
+    // headline stat cards above too.
+    renderProgressView(rootContainer);
   });
 
   section.appendChild(form);
-
-  const logs = await storage.getBodyLogs();
   section.appendChild(renderTrends(logs));
   section.appendChild(renderLogList(logs));
 
@@ -189,9 +251,8 @@ function renderTrends(logs) {
   const wrap = document.createElement("div");
   wrap.className = "trend-section";
 
-  const chronological = [...logs].reverse();
-  const weightPoints = chronological.filter((l) => l.weightKg != null).map((l) => ({ date: l.date, value: l.weightKg }));
-  const waistPoints = chronological.filter((l) => l.waistCm != null).map((l) => ({ date: l.date, value: l.waistCm }));
+  const weightPoints = metricPoints(logs, "weightKg");
+  const waistPoints = metricPoints(logs, "waistCm");
 
   if (weightPoints.length >= 2) wrap.appendChild(renderMetricTrend("Gewicht", weightPoints, "kg"));
   if (waistPoints.length >= 2) wrap.appendChild(renderMetricTrend("Taille", waistPoints, "cm"));
@@ -232,7 +293,7 @@ function renderMetricTrend(label, points, unit) {
     : `${formatSigned(totalDelta, unit)} totaal sinds ${formatShortDate(first.date)}`;
   box.appendChild(detail);
 
-  box.appendChild(renderSparkline(points.map((p) => p.value)));
+  box.appendChild(renderSparkline(points.map((p) => p.value), { area: true, height: 70 }));
   return box;
 }
 
@@ -283,7 +344,7 @@ function renderLogList(logs) {
   return list;
 }
 
-async function renderPhotoSection() {
+async function renderPhotoSection(rootContainer) {
   const section = document.createElement("section");
 
   const heading = document.createElement("h3");
@@ -329,7 +390,7 @@ async function renderPhotoSection() {
       blob: file,
     });
     status.textContent = "Foto opgeslagen.";
-    section.replaceWith(await renderPhotoSection());
+    section.replaceWith(await renderPhotoSection(rootContainer));
   });
 
   section.appendChild(form);
