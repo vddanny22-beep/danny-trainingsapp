@@ -9,11 +9,29 @@ const STROKE = 6;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
+// Each ring gets its own gradient id — <defs> ids are global to the document,
+// so two rings on screen at once (unlikely today, but cheap to guard against)
+// would otherwise silently share (and fight over) one gradient.
+let ringInstance = 0;
+
 export function renderProgressRing(fraction, label = "") {
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
   svg.setAttribute("class", "progress-ring");
+
+  const gradientId = `progress-ring-track-${ringInstance++}`;
+  const defs = document.createElementNS(svgNS, "defs");
+  const gradient = document.createElementNS(svgNS, "linearGradient");
+  gradient.setAttribute("id", gradientId);
+  gradient.setAttribute("x1", "0");
+  gradient.setAttribute("y1", "0");
+  gradient.setAttribute("x2", "1");
+  gradient.setAttribute("y2", "1");
+  // Brushed-metal look for the unfilled track, in place of a flat fill.
+  gradient.innerHTML = '<stop offset="0" stop-color="#33373f"/><stop offset="1" stop-color="#1c1f24"/>';
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
 
   const track = document.createElementNS(svgNS, "circle");
   track.setAttribute("class", "progress-ring-track");
@@ -21,6 +39,7 @@ export function renderProgressRing(fraction, label = "") {
   track.setAttribute("cy", SIZE / 2);
   track.setAttribute("r", RADIUS);
   track.setAttribute("fill", "none");
+  track.setAttribute("stroke", `url(#${gradientId})`);
   track.setAttribute("stroke-width", STROKE);
   svg.appendChild(track);
 

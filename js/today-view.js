@@ -79,6 +79,25 @@ function parseSetRow(row) {
   return { weight, reps };
 }
 
+// Toggles the little checkmark on each set row using the same "counts as
+// done" rule as the ring and the final save, so all three always agree.
+function refreshSetCheckmarks(form) {
+  form.querySelectorAll(".set-row").forEach((row) => {
+    row.classList.toggle("done", parseSetRow(row) !== null);
+  });
+}
+
+// The first exercise always opens expanded; the rest start collapsed so the
+// day reads as "what's next" instead of a wall of sets. An exercise with any
+// restored draft data expands too, so resuming a half-finished workout still
+// shows the sets already filled in.
+function autoExpandBlocks(form) {
+  [...form.querySelectorAll(".exercise-block")].forEach((block, index) => {
+    const hasData = [...block.querySelectorAll(".set-row")].some((row) => parseSetRow(row) !== null);
+    if (index === 0 || hasData) block.classList.add("expanded");
+  });
+}
+
 async function renderForDay(container, days, selectedDayId) {
   const day = days.find((d) => d.id === selectedDayId) || days[0];
   container.innerHTML = "";
@@ -109,8 +128,8 @@ async function renderForDay(container, days, selectedDayId) {
   const form = document.createElement("form");
   form.className = "today-form";
 
-  for (const exercise of day.exercises) {
-    form.appendChild(await renderExerciseBlock(exercise, day));
+  for (const [index, exercise] of day.exercises.entries()) {
+    form.appendChild(await renderExerciseBlock(exercise, day, index));
   }
 
   const note = document.createElement("textarea");
@@ -127,17 +146,22 @@ async function renderForDay(container, days, selectedDayId) {
     container.appendChild(renderDraftNotice(container, days, day));
   }
 
-  // Ring starts reflecting whatever was just restored from the draft (or
-  // stays at 0/total on a fresh form), not just future keystrokes.
+  // Ring and per-set checkmarks start reflecting whatever was just restored
+  // from the draft (or stay at their empty state on a fresh form), not just
+  // future keystrokes. Exercises with restored data also auto-expand, so
+  // reopening a half-finished workout doesn't hide the sets already filled in.
   refreshProgressRing(ringSvg, form, totalSets);
+  refreshSetCheckmarks(form);
+  autoExpandBlocks(form);
 
   // Every keystroke, so nothing is lost however the tab goes away — a switch,
   // a reload, or the phone killing the page between sets. The same listener
-  // also drives the dashboard ring, so filling in a set updates both without
-  // a second "input" subscription on the form.
+  // also drives the dashboard ring and the per-set checkmarks, so filling in
+  // a set updates all three without extra "input" subscriptions on the form.
   form.addEventListener("input", () => {
     saveDraft(day.id, collectDraft(form));
     refreshProgressRing(ringSvg, form, totalSets);
+    refreshSetCheckmarks(form);
   });
 
   const saveBtn = document.createElement("button");
@@ -229,27 +253,26 @@ function renderDraftNotice(container, days, day) {
   return notice;
 }
 
-async function renderExerciseBlock(exercise, day) {
-  const block = document.createElement("fieldset");
+async function renderExerciseBlock(exercise, day, index) {
+  const block = document.createElement("div");
   block.className = "exercise-block";
   block.dataset.exerciseId = exercise.id;
   block.dataset.exerciseName = exercise.name;
 
-  const legend = document.createElement("legend");
-  legend.textContent = `${exercise.name} (${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps)`;
-  block.appendChild(legend);
-
-  // Fetched once and used for both lines below — the suggestion is derived
-  // from exactly the sets shown as "vorige keer".
+  // Fetched once and used below — the suggestion is derived from exactly the
+  // sets shown as "vorige keer".
   const last = await storage.getLastEntryForExerciseName(exercise.name);
-
   const suggestedWeight = computeSuggestedWeight(last, exercise, day);
-  if (suggestedWeight != null) {
-    const hint = document.createElement("p");
-    hint.className = "suggested-weight";
-    hint.textContent = `Voorgesteld gewicht: ${suggestedWeight} kg`;
-    block.appendChild(hint);
-  }
+
+  block.appendChild(renderExerciseHeader(exercise, suggestedWeight, block));
+
+  const body = document.createElement("div");
+  body.className = "exercise-body";
+
+  const meta = document.createElement("p");
+  meta.className = "exercise-meta";
+  meta.textContent = `${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps`;
+  body.appendChild(meta);
 
   // The suggestion alone doesn't say whether you cruised through last time or
   // barely finished — the actual reps do, and that's what decides whether to
@@ -259,14 +282,16 @@ async function renderExerciseBlock(exercise, day) {
     previous.className = "previous-sets";
     const setsText = last.entry.sets.map((set) => `${set.weight}×${set.reps}`).join("  ");
     previous.textContent = `Vorige keer (${formatShortDate(last.date)}): ${setsText}`;
-    block.appendChild(previous);
+    body.appendChild(previous);
   }
 
   for (let i = 1; i <= exercise.sets; i++) {
     const setRow = document.createElement("div");
     setRow.className = "set-row";
+    setRow.appendChild(renderSetCheckIcon());
 
     const setLabel = document.createElement("span");
+    setLabel.className = "set-label";
     setLabel.textContent = `Set ${i}`;
     setRow.appendChild(setLabel);
 
@@ -286,10 +311,68 @@ async function renderExerciseBlock(exercise, day) {
     });
     setRow.appendChild(repsInput);
 
-    block.appendChild(setRow);
+    body.appendChild(setRow);
   }
 
+  block.appendChild(body);
   return block;
+}
+
+// Tappable summary row: exercise name, its suggested-weight chip, and a
+// chevron that flips the block's collapsed/expanded state. Kept separate
+// from the sets themselves (`.exercise-body`) so collapsing one exercise
+// never touches the inputs the form actually reads on save.
+function renderExerciseHeader(exercise, suggestedWeight, block) {
+  const header = document.createElement("button");
+  header.type = "button";
+  header.className = "exercise-header";
+
+  const name = document.createElement("span");
+  name.className = "exercise-name";
+  name.textContent = exercise.name;
+  header.appendChild(name);
+
+  const right = document.createElement("span");
+  right.className = "exercise-header-right";
+
+  const chip = document.createElement("span");
+  chip.className = suggestedWeight != null ? "chip" : "chip chip-muted";
+  chip.textContent = suggestedWeight != null ? `${suggestedWeight} kg` : "–";
+  right.appendChild(chip);
+
+  right.appendChild(renderChevronIcon());
+  header.appendChild(right);
+
+  header.addEventListener("click", () => block.classList.toggle("expanded"));
+  return header;
+}
+
+function renderChevronIcon() {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "exercise-chevron");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(svgNS, "path");
+  path.setAttribute("d", "M9 6l6 6-6 6");
+  svg.appendChild(path);
+  return svg;
+}
+
+// Circle-outline/checkmark pair for one set row; CSS crossfades between them
+// based on the row's own ".done" class (see refreshSetCheckmarks), so no DOM
+// swapping is needed as the user types.
+function renderSetCheckIcon() {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "set-check-icon");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML =
+    '<circle class="check-bg" cx="12" cy="12" r="11"/>' +
+    '<circle class="check-ring" cx="12" cy="12" r="10.5"/>' +
+    '<path class="check-mark" d="M7 12.5l3 3 7-7"/>';
+  return svg;
 }
 
 function formatShortDate(date) {
