@@ -765,12 +765,55 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .progress-row {
-  background: var(--bg-card);
+  background: linear-gradient(165deg, #1e2129, #15181d);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-bottom: var(--space-2);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Headline weight/waist cards (Voortgang tab), above everything else. */
+.stat-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.stat-card {
+  flex: 1;
+  min-width: 0;
+  background: linear-gradient(165deg, #1e2129, #15181d);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.stat-card-label {
+  margin: 0 0 6px;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.stat-card-value {
+  margin: 0 0 4px;
+  font-size: var(--font-2xl);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.stat-card-unit {
+  font-size: var(--font-md);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+}
+
+.stat-card-delta {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--accent);
 }
 
 .progress-label {
@@ -838,15 +881,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   stroke: var(--accent);
 }
 
+.sparkline-fill-stop-top {
+  stop-color: var(--accent);
+  stop-opacity: 0.35;
+}
+
+.sparkline-fill-stop-bottom {
+  stop-color: var(--accent);
+  stop-opacity: 0;
+}
+
 /* Sync-instellingen */
 
 .sync-settings {
-  background: var(--bg-card);
+  background: linear-gradient(165deg, #1e2129, #15181d);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-top: var(--space-4);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .sync-help {
@@ -880,7 +933,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .body-log-form,
 .photo-form {
-  background: var(--bg-card);
+  background: linear-gradient(165deg, #1e2129, #15181d);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
@@ -888,7 +941,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .body-log-date,
@@ -953,31 +1006,36 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .body-log-item {
-  background: var(--bg-card);
+  background: linear-gradient(165deg, #1e2129, #15181d);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-bottom: var(--space-2);
 }
 
+/* Horizontal filmstrip instead of a fixed grid — reads as a timeline of
+   photos to swipe through, and a phone-width screen only ever showed ~2
+   grid columns anyway. */
 .photo-gallery {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
 }
 
 .photo-cell {
-  background: var(--bg-card);
+  flex: 0 0 128px;
+  background: linear-gradient(165deg, #1e2129, #15181d);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-2);
   text-align: center;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .photo-thumb {
-  width: 100%;
-  height: 140px;
+  width: 128px;
+  height: 160px;
   object-fit: cover;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -985,10 +1043,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .photo-cell.enlarged {
-  grid-column: 1 / -1;
+  flex-basis: 240px;
 }
 
 .photo-cell.enlarged .photo-thumb {
+  width: 240px;
   height: auto;
   object-fit: contain;
 }
@@ -1001,13 +1060,53 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* AI Coach tab */
 
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.chat-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: rgba(163, 230, 53, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-avatar svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chat-header-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--font-md);
+}
+
+.chat-header-sub {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
 .chat-box {
-  background: var(--bg-card);
+  background: linear-gradient(165deg, #1e2129, #15181d);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-2);
   margin-bottom: var(--space-3);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .chat-messages {
@@ -1048,14 +1147,42 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--danger);
 }
 
+.quick-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: var(--space-2);
+  padding-bottom: 2px;
+}
+
+.quick-chip {
+  flex: none;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-sm);
+  padding: 8px 12px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .chat-input-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
 .chat-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: var(--space-3);
   font-size: var(--font-md);
   border-radius: var(--radius-sm);
@@ -1064,6 +1191,35 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--text-primary);
   font-family: inherit;
   resize: vertical;
+}
+
+.chat-send-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: linear-gradient(180deg, #b9f24c, #8fd424);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.chat-send-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.chat-send-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .notification-setting {

@@ -9,12 +9,15 @@ import { showToast } from "./ui-toast.js";
 // messages are sent to the API on each turn to keep requests small.
 const MAX_HISTORY_SENT = 20;
 
+// A handful of common questions to get someone started without having to
+// think of a question first — tapping one fills the input rather than
+// sending straight away, so a wrong guess doesn't cost an API call.
+const QUICK_QUESTIONS = ["Hoeveel eiwit heb ik nodig?", "Wat eet ik op een rustdag?", "Ben ik aan het stagneren?"];
+
 export async function renderChatView(container) {
   container.innerHTML = "";
 
-  const heading = document.createElement("h2");
-  heading.textContent = "AI Coach";
-  container.appendChild(heading);
+  container.appendChild(renderChatHeader());
 
   const intro = document.createElement("p");
   intro.className = "sync-help";
@@ -40,17 +43,26 @@ export async function renderChatView(container) {
   const form = document.createElement("form");
   form.className = "chat-input-form";
 
+  const inputRow = document.createElement("div");
+  inputRow.className = "chat-input-row";
+
   const textarea = document.createElement("textarea");
   textarea.className = "chat-input";
   textarea.placeholder = "Bijv. 'Hoeveel eiwit heb ik nodig op een trainingsdag?'";
   textarea.rows = 2;
-  form.appendChild(textarea);
+  inputRow.appendChild(textarea);
+
+  container.appendChild(renderQuickChips(textarea));
 
   const sendBtn = document.createElement("button");
   sendBtn.type = "submit";
-  sendBtn.className = "btn btn-primary";
-  sendBtn.textContent = "Versturen";
-  form.appendChild(sendBtn);
+  sendBtn.className = "chat-send-btn";
+  sendBtn.setAttribute("aria-label", "Versturen");
+  sendBtn.innerHTML =
+    '<svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  inputRow.appendChild(sendBtn);
+
+  form.appendChild(inputRow);
 
   const status = document.createElement("p");
   status.className = "save-status";
@@ -133,6 +145,52 @@ export async function renderChatView(container) {
     renderChatView(container);
   });
   container.appendChild(clearBtn);
+}
+
+function renderChatHeader() {
+  const header = document.createElement("div");
+  header.className = "chat-header";
+
+  const avatar = document.createElement("div");
+  avatar.className = "chat-avatar";
+  avatar.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14a3 3 0 0 1-3 3H8.5L4.5 20.5V6a3 3 0 0 1 3-3h9.5a3 3 0 0 1 3 3z"/></svg>';
+  header.appendChild(avatar);
+
+  const text = document.createElement("div");
+  const name = document.createElement("p");
+  name.className = "chat-header-name";
+  name.textContent = "AI Coach";
+  text.appendChild(name);
+  const sub = document.createElement("p");
+  sub.className = "chat-header-sub";
+  sub.textContent = "Sport, voeding & krachttraining";
+  text.appendChild(sub);
+  header.appendChild(text);
+
+  return header;
+}
+
+// Tapping a chip fills the textarea rather than sending straight away, so a
+// question that isn't quite what you meant doesn't cost an API call — same
+// reason the send button stays a separate, deliberate tap.
+function renderQuickChips(textarea) {
+  const row = document.createElement("div");
+  row.className = "quick-chips";
+
+  QUICK_QUESTIONS.forEach((question) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "quick-chip";
+    chip.textContent = question;
+    chip.addEventListener("click", () => {
+      textarea.value = question;
+      textarea.focus();
+    });
+    row.appendChild(chip);
+  });
+
+  return row;
 }
 
 function renderApiKeySettings(rootContainer) {
