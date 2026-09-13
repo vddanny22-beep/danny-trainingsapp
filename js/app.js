@@ -71,7 +71,8 @@ async function switchTab(name) {
 }
 
 function setActiveNav(button) {
-  NAV_BUTTONS.forEach((b) => b.classList.remove("active"));
+  NAV_BUTTONS.forEach((b) => { b.classList.remove("active"); b.removeAttribute("aria-current"); });
+  button.setAttribute("aria-current", "page");
   button.classList.add("active");
 
   const index = NAV_BUTTONS.indexOf(button);

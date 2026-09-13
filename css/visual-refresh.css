@@ -1,0 +1,50 @@
+/* Shared visual layer. All assets remain available offline. */
+:root { --bg-page:#101211; --bg-card:#1a1e1b; --bg-card-alt:#242a25; --border:#333b34; --text-secondary:#afb9af; --accent:#c2f36b; --accent-text:#17220b; --nav-height:70px; --radius-md:18px; --radius-lg:22px; color-scheme:dark; }
+body { line-height:1.5; }
+body::before { display:none; }
+.app-header { display:flex; align-items:center; justify-content:space-between; max-width:680px; margin:auto; padding:calc(20px + var(--safe-top)) 22px 18px; background:#101211f5; border:0; backdrop-filter:blur(16px); }
+.brand-lockup { display:flex; gap:12px; align-items:center; }
+.brand-symbol { background:var(--accent); color:#17220b; width:39px; height:39px; border-radius:12px; display:grid; place-items:center; font-size:29px; font-weight:800; }
+.brand-eyebrow { color:var(--text-secondary); font-size:9px; font-weight:700; letter-spacing:.19em; }
+.app-header h1 { font-size:16px; color:#f5f6f1; letter-spacing:-.025em; text-transform:none; }
+.brand-badge { width:35px; height:35px; border:1px solid #43503b; background:#242d20; color:var(--accent); border-radius:50%; display:grid; place-items:center; font-size:13px; font-weight:700; }
+#content { max-width:680px; padding:8px 22px calc(var(--nav-height) + var(--safe-bottom) + 40px); }
+.today-hero { position:relative; overflow:hidden; min-height:252px; padding:25px; align-items:flex-end; border:1px solid #46503a; border-radius:24px; background:linear-gradient(90deg,rgba(9,16,9,.9),rgba(10,17,9,.25)),linear-gradient(0deg,#111a10 0%,transparent 90%),url('../images/header-bg.jpg') center/cover; box-shadow:0 14px 34px #0003; margin-bottom:22px; }
+.today-hero-date { font-size:11px; font-weight:600; color:#d0d8c7; letter-spacing:.03em; margin-bottom:14px; }
+.today-hero-day { font-size:clamp(24px,6vw,34px); letter-spacing:-.045em; line-height:1.08; text-transform:none; max-width:330px; overflow-wrap:anywhere; }
+.hero-subtitle { font-size:13px; color:#d2d8cc; margin:12px 0 17px; }
+.hero-stats { color:var(--accent); font-size:11px; font-weight:700; margin:0; }
+.hero-progress { flex:none; text-align:center; display:grid; justify-items:center; gap:6px; padding-bottom:2px; }
+.hero-progress span { font-size:8px; letter-spacing:.07em; color:#d2d8cc; }
+.today-hero-ring { width:64px; height:64px; }
+.day-picker { min-height:52px; border-radius:14px; padding:12px 15px; font-size:14px; margin-bottom:24px; }
+.workout-section-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:13px; }
+.workout-section-heading h3 { font-size:18px; margin:0; letter-spacing:-.03em; }
+.workout-section-heading span { font-size:11px; color:var(--text-secondary); }
+.exercise-block { background:var(--bg-card); padding:14px; margin-bottom:12px; box-shadow:none; border-color:#303730; }
+.exercise-block.expanded { border-color:#617346; }
+.exercise-header { gap:11px; min-height:57px; }
+.exercise-art { flex:none; width:51px; height:57px; display:grid; place-items:center; color:#c2dc9e; border-radius:12px; background:linear-gradient(135deg,#35432b,#232a20); }
+.exercise-art svg { width:48px; height:48px; }
+.exercise-title { flex:1; min-width:0; }
+.exercise-name { font-size:14px; line-height:1.3; display:block; overflow-wrap:anywhere; }
+.exercise-summary { display:block; color:var(--text-secondary); font-size:10px; margin-top:5px; }
+.exercise-header-right { gap:3px; }
+.exercise-header .chip { font-size:11px; padding:4px 7px; }
+.exercise-body { border-top:1px solid var(--border); padding-top:15px; margin-top:14px; }
+.exercise-meta { font-size:11px; margin-bottom:12px; }
+.set-row { grid-template-columns:18px 40px minmax(0,1fr) minmax(0,1fr); gap:8px; }
+.set-label { font-size:12px; color:var(--text-secondary); }
+.set-row input { min-width:0; min-height:47px; padding:10px; text-align:center; font-size:16px; background:#111612; border-color:#364033; border-radius:10px; font-variant-numeric:tabular-nums; }
+.set-row.done input { border-color:#617b41; background:#202d1b; }
+.btn { border-radius:13px; min-height:48px; }
+.btn-primary { box-shadow:0 5px 20px #b0ed4820; }
+.session-note-input { background:var(--bg-card); border-radius:15px; padding:15px; margin-top:8px; }
+.app-nav { max-width:680px; margin:auto; background:#1a1f1bf5; backdrop-filter:blur(20px); border:1px solid #354031; border-bottom:0; border-radius:21px 21px 0 0; }
+.nav-btn { gap:5px; font-size:10px; }
+.nav-indicator { top:10px; }
+.nav-icon { width:22px; height:22px; }
+.day-card { background:var(--bg-card); padding:18px; border-radius:18px; }
+h2 { letter-spacing:-.035em; }
+@media(min-width:760px) { .today-hero { min-height:280px; } .today-hero-day { font-size:38px; } .exercise-art { width:60px; } }
+@media(max-width:360px) { #content { padding-inline:14px; } .app-header { padding-inline:14px; } .today-hero { padding:18px; } .exercise-art { width:40px; } .exercise-art svg { width:38px; } .exercise-header { gap:7px; } .exercise-header .chip { font-size:10px; } }

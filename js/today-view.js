@@ -45,12 +45,26 @@ function renderHero(day, totalSets) {
   dayName.className = "today-hero-day";
   dayName.textContent = day.name;
   text.appendChild(dayName);
+  const subtitle = document.createElement("p");
+  subtitle.className = "hero-subtitle";
+  subtitle.textContent = "Bouw verder aan je kracht.";
+  text.appendChild(subtitle);
+  const stats = document.createElement("p");
+  stats.className = "hero-stats";
+  stats.textContent = day.exercises.length + " oefeningen  /  " + totalSets + " sets";
+  text.appendChild(stats);
 
   hero.appendChild(text);
 
   const ringSvg = renderProgressRing(0, totalSets ? `0/${totalSets}` : "–");
   ringSvg.classList.add("today-hero-ring");
-  hero.appendChild(ringSvg);
+  const progress = document.createElement("div");
+  progress.className = "hero-progress";
+  progress.appendChild(ringSvg);
+  const progressLabel = document.createElement("span");
+  progressLabel.textContent = "SETS VOLTOOID";
+  progress.appendChild(progressLabel);
+  hero.appendChild(progress);
 
   return { hero, ringSvg };
 }
@@ -95,6 +109,7 @@ function autoExpandBlocks(form) {
   [...form.querySelectorAll(".exercise-block")].forEach((block, index) => {
     const hasData = [...block.querySelectorAll(".set-row")].some((row) => parseSetRow(row) !== null);
     if (index === 0 || hasData) block.classList.add("expanded");
+    block.querySelector(".exercise-header").setAttribute("aria-expanded", String(block.classList.contains("expanded")));
   });
 }
 
@@ -108,6 +123,7 @@ async function renderForDay(container, days, selectedDayId) {
 
   const picker = document.createElement("select");
   picker.className = "day-picker";
+  picker.setAttribute("aria-label", "Kies je trainingsdag");
   days.forEach((d) => {
     const opt = document.createElement("option");
     opt.value = d.id;
@@ -117,6 +133,10 @@ async function renderForDay(container, days, selectedDayId) {
   });
   picker.addEventListener("change", () => renderForDay(container, days, picker.value));
   container.appendChild(picker);
+  const section = document.createElement("div");
+  section.className = "workout-section-heading";
+  section.innerHTML = '<h3>Je oefeningen</h3><span>Vul je sets in</span>';
+  container.appendChild(section);
 
   if (!day.exercises.length) {
     const empty = document.createElement("p");
@@ -258,6 +278,7 @@ async function renderExerciseBlock(exercise, day, index) {
   block.className = "exercise-block";
   block.dataset.exerciseId = exercise.id;
   block.dataset.exerciseName = exercise.name;
+  block.dataset.exerciseIndex = index + 1;
 
   // Fetched once and used below — the suggestion is derived from exactly the
   // sets shown as "vorige keer".
@@ -296,6 +317,7 @@ async function renderExerciseBlock(exercise, day, index) {
     setRow.appendChild(setLabel);
 
     const weightInput = makeDecimalInput("weight-input", "kg");
+    weightInput.setAttribute("aria-label", `${exercise.name}, set ${i}, gewicht in kg`);
     if (suggestedWeight != null) weightInput.value = suggestedWeight;
     setRow.appendChild(weightInput);
 
@@ -303,6 +325,7 @@ async function renderExerciseBlock(exercise, day, index) {
     repsInput.type = "number";
     repsInput.placeholder = "reps";
     repsInput.className = "reps-input";
+    repsInput.setAttribute("aria-label", `${exercise.name}, set ${i}, herhalingen`);
     // Filling in reps means the set is done, so that's when the rest starts.
     // "change" rather than "input": this fires once the field is committed,
     // not on every keystroke, which would restart the timer mid-typing.
@@ -326,11 +349,26 @@ function renderExerciseHeader(exercise, suggestedWeight, block) {
   const header = document.createElement("button");
   header.type = "button";
   header.className = "exercise-header";
+  header.setAttribute("aria-expanded", "false");
+  const thumb = document.createElement("span");
+  thumb.className = "exercise-art";
+  thumb.setAttribute("aria-hidden", "true");
+  const leg = /leg|squat|calf/i.test(exercise.name);
+  const cable = /cable|pull|row|fly|delt/i.test(exercise.name);
+  const drawing = leg ? '<path d="M16 43h33M23 39l9-13 12 8-4 10M32 26l-7-9M21 17h12M44 34l7-13M49 20h7"/><circle cx="21" cy="12" r="4"/>' : cable ? '<path d="M16 49V12h35v37M12 49h12M44 49h12M34 12v13M26 25h16M27 29l7 5 8-5M34 34v10M26 49l8-5 8 5"/><circle cx="34" cy="24" r="4"/>' : '<path d="M14 27v14M20 21v26M20 34h26M46 21v26M52 27v14"/>';
+  thumb.innerHTML = '<svg viewBox="0 0 68 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + drawing + '</svg>';
+  header.appendChild(thumb);
 
   const name = document.createElement("span");
   name.className = "exercise-name";
   name.textContent = exercise.name;
-  header.appendChild(name);
+  const title = document.createElement("span");
+  title.className = "exercise-title";
+  const detail = document.createElement("span");
+  detail.className = "exercise-summary";
+  detail.textContent = exercise.sets + " sets · " + exercise.repMin + "–" + exercise.repMax + " reps";
+  title.append(name, detail);
+  header.appendChild(title);
 
   const right = document.createElement("span");
   right.className = "exercise-header-right";
@@ -343,7 +381,10 @@ function renderExerciseHeader(exercise, suggestedWeight, block) {
   right.appendChild(renderChevronIcon());
   header.appendChild(right);
 
-  header.addEventListener("click", () => block.classList.toggle("expanded"));
+  header.addEventListener("click", () => {
+    const expanded = block.classList.toggle("expanded");
+    header.setAttribute("aria-expanded", String(expanded));
+  });
   return header;
 }
 
