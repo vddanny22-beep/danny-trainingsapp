@@ -6,12 +6,13 @@
 // this file byte-identical, so no update is ever detected and every
 // installed client keeps serving the stale cached copy forever, no matter
 // how many times they close and reopen the app.
-const CACHE_NAME = "trainingsapp-v24";
+const CACHE_NAME = "trainingsapp-v25";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
   "./css/style.css",
+  "./css/visual-refresh.css",
   "./images/header-bg.jpg",
   "./js/app.js",
   "./js/storage.js",

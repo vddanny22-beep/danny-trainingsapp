@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <!-- viewport-fit=cover lets the app paint into the notch/home-indicator
        areas; css/style.css pads content back with env(safe-area-inset-*). -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#1a1d23" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,15 +16,16 @@
   <!-- iOS ignores SVG here, so the home-screen icon must be a PNG. -->
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/visual-refresh.css" />
 </head>
 <body>
   <header class="app-header">
-    <h1>Trainingsschema</h1>
+    <div class="brand-lockup"><span class="brand-symbol" aria-hidden="true">↗</span><div><span class="brand-eyebrow">JOUW TRAINING</span><h1>Sterker, elke sessie.</h1></div></div><span class="brand-badge" aria-hidden="true">T</span>
   </header>
 
   <main id="content"></main>
 
-  <nav class="app-nav">
+  <nav class="app-nav" aria-label="Hoofdnavigatie">
     <div class="nav-indicator" aria-hidden="true"></div>
     <button id="nav-today" class="nav-btn active">
       <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
