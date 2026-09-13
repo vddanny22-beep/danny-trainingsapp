@@ -99,7 +99,14 @@ body::before {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--bg-card);
+  /* Dark gradient on top of the photo (not just a flat tint) so the lime
+     title and nav stay readable regardless of how light the crop underneath
+     gets — a flat rgba wash alone washed out against the brightest plate. */
+  background-color: var(--bg-card);
+  background-image: linear-gradient(180deg, rgba(15, 17, 21, 0.6), rgba(15, 17, 21, 0.88)), url("../images/header-bg.jpg");
+  background-size: cover, cover;
+  background-position: center, center 35%;
+  background-repeat: no-repeat, no-repeat;
   color: var(--text-primary);
   padding: var(--space-3) var(--space-4);
   /* The status bar is translucent in standalone mode, so the header has to
