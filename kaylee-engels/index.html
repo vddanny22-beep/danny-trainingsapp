@@ -187,6 +187,19 @@ function check(){
  if(!val) return;
  const accepted=[current.a,...(current.alts||[])].map(norm);
  const ok=accepted.includes(val);
+
+ function editDistance(a,b){
+   const m=a.length,n=b.length,dp=Array.from({length:m+1},()=>Array(n+1).fill(0));
+   for(let i=0;i<=m;i++) dp[i][0]=i;
+   for(let j=0;j<=n;j++) dp[0][j]=j;
+   for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+     dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+   }
+   return dp[m][n];
+ }
+ const bestDistance=Math.min(...accepted.map(a=>editDistance(val,a)));
+ const typoClose=!ok && current.type==='Woord' && bestDistance===1 && val.length>=4;
+
  awaiting=true;
  document.getElementById('answer').disabled=true;
  document.getElementById('checkBtn').style.display='none';
@@ -196,10 +209,14 @@ function check(){
    correct++;
    fb.className='feedback good';
    fb.textContent='Goed! ✓';
+ } else if(typoClose){
+   correct++;
+   fb.className='feedback good';
+   fb.innerHTML='Bijna helemaal goed ✓ Alleen de spelling: <strong>'+current.a+'</strong>';
  } else {
    wrong.push(current);
    fb.className='feedback bad';
-   fb.innerHTML='Bijna. Het goede antwoord is: <strong>'+current.a+'</strong>';
+   fb.innerHTML='Nog niet helemaal. Het goede antwoord is: <strong>'+current.a+'</strong>';
    if(mode!=='test') queue.push({...current,repeat:true});
  }
  document.getElementById('scoreNow').textContent=correct+' goed';
