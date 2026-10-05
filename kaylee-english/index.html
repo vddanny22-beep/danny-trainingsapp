@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6c5ce7">
+<title>Kaylee's English Club</title>
+<style>
+:root{--bg:#f7f5ff;--card:#fff;--ink:#211f2d;--muted:#77738a;--primary:#6c5ce7;--primary2:#8e7dff;--ok:#19a974;--bad:#df4d62;--line:#e8e4f6;--shadow:0 12px 34px rgba(48,37,91,.12)}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#f8f6ff 0%,#eef8ff 100%);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+button,input{font:inherit}.app{max-width:720px;margin:0 auto;padding:18px 16px 40px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.brand{display:flex;align-items:center;gap:10px}.logo{width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,var(--primary),#ff77b7);display:grid;place-items:center;color:white;font-size:22px;box-shadow:var(--shadow)}h1{font-size:20px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:2px}.pill{background:white;border:1px solid var(--line);border-radius:999px;padding:8px 11px;font-weight:700;font-size:13px;white-space:nowrap}
+.card{background:rgba(255,255,255,.96);border:1px solid rgba(232,228,246,.9);border-radius:24px;box-shadow:var(--shadow);padding:20px}.hero{padding:22px;background:linear-gradient(135deg,#6c5ce7,#8e7dff);color:#fff;overflow:hidden;position:relative}.hero:after{content:"ABC";position:absolute;right:-10px;bottom:-18px;font-size:90px;font-weight:900;opacity:.08;transform:rotate(-8deg)}.hero h2{margin:0 0 6px;font-size:26px}.hero p{margin:0;opacity:.9;line-height:1.45}.streak{display:inline-flex;gap:6px;align-items:center;margin-top:16px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.14);font-weight:700;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.mode{border:0;text-align:left;padding:17px;border-radius:20px;background:#fff;box-shadow:0 8px 22px rgba(48,37,91,.08);border:1px solid var(--line);cursor:pointer;min-height:118px}.mode:active{transform:scale(.98)}.mode .ico{font-size:25px}.mode b{display:block;margin-top:8px;font-size:16px}.mode span{font-size:12px;color:var(--muted);display:block;margin-top:4px;line-height:1.35}.mode.primary{background:linear-gradient(135deg,#fff4fb,#f3efff)}
+.sectionTitle{font-size:13px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin:22px 2px 10px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:white;border:1px solid var(--line);border-radius:17px;padding:14px;text-align:center}.stat b{display:block;font-size:20px}.stat span{color:var(--muted);font-size:11px}
+.hidden{display:none!important}.quizTop{display:flex;align-items:center;gap:10px;margin-bottom:14px}.back{width:40px;height:40px;border-radius:13px;border:1px solid var(--line);background:white;font-size:20px}.progressWrap{flex:1}.progressText{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}.bar{height:9px;border-radius:99px;background:#ece9f7;overflow:hidden}.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--primary),#ff7ab8);border-radius:99px;transition:.3s}
+.qtag{display:inline-block;padding:7px 10px;border-radius:999px;background:#f0edff;color:#5b4bcc;font-size:12px;font-weight:800}.question{font-size:25px;font-weight:800;line-height:1.28;margin:18px 0 6px}.hint{color:var(--muted);font-size:13px;margin-bottom:18px}.answer{width:100%;border:2px solid var(--line);border-radius:17px;padding:16px 15px;font-size:18px;outline:none;background:#fff}.answer:focus{border-color:#9d90ef;box-shadow:0 0 0 4px #f0edff}.actions{display:flex;gap:10px;margin-top:12px}.btn{border:0;border-radius:16px;padding:14px 17px;font-weight:800;cursor:pointer}.btnMain{flex:1;background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff}.btnGhost{background:#f2effb;color:#51496e}.feedback{margin-top:14px;border-radius:18px;padding:14px 15px;font-size:14px;line-height:1.45}.feedback.ok{background:#eaf9f3;color:#117b58}.feedback.bad{background:#fff0f2;color:#a63245}.correct{font-weight:900;font-size:17px;display:block;margin-top:4px}.miniNote{font-size:12px;color:var(--muted);margin-top:10px}
+.options{display:grid;gap:10px}.option{padding:14px;border-radius:16px;border:2px solid var(--line);background:#fff;text-align:left;font-weight:700}.option.selected{border-color:var(--primary);background:#f3f0ff}
+.finish{text-align:center;padding:28px 20px}.finish .big{font-size:58px}.finish h2{font-size:28px;margin:6px 0}.scoreRing{width:118px;height:118px;border-radius:50%;display:grid;place-items:center;margin:18px auto;background:conic-gradient(var(--primary) var(--p),#ece9f7 0);position:relative}.scoreRing:after{content:"";position:absolute;width:88px;height:88px;background:white;border-radius:50%}.scoreRing b{z-index:1;font-size:24px}.row{display:flex;gap:10px}.row .btn{flex:1}.wrongList{margin-top:16px;text-align:left}.wrongItem{padding:12px 0;border-bottom:1px solid var(--line)}.wrongItem b{display:block}.wrongItem span{font-size:13px;color:var(--muted)}
+.footerNote{text-align:center;color:var(--muted);font-size:11px;margin-top:22px}
+@media(max-width:430px){.question{font-size:22px}.card{padding:17px}.grid{gap:9px}.mode{padding:14px;min-height:112px}.hero h2{font-size:23px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <section id="home">
+    <div class="top">
+      <div class="brand"><div class="logo">K</div><div><h1>Kaylee's English Club</h1><div class="sub">Food • phrases • grammar</div></div></div>
+      <div class="pill" id="homeScore">⭐ 0 XP</div>
+    </div>
+
+    <div class="card hero">
+      <h2>Hi Kaylee 👋</h2>
+      <p>Klaar om Engels te oefenen? Fouten zijn juist handig: moeilijke vragen komen vanzelf terug.</p>
+      <div class="streak">🔥 <span id="streakText">Start je eerste ronde</span></div>
+    </div>
+
+    <div class="sectionTitle">Kies een oefening</div>
+    <div class="grid">
+      <button class="mode primary" onclick="startQuiz('mixed')"><div class="ico">🎯</div><b>Alles door elkaar</b><span>Woorden, zinnen en grammar gemixt.</span></button>
+      <button class="mode" onclick="startQuiz('words')"><div class="ico">🍅</div><b>Words</b><span>Vertalen én Engelse spelling.</span></button>
+      <button class="mode" onclick="startQuiz('phrases')"><div class="ico">💬</div><b>Phrases</b><span>De zinnen van je leerblad.</span></button>
+      <button class="mode" onclick="startQuiz('grammar')"><div class="ico">✍️</div><b>Grammar</b><span>It is, they are en de korte vormen.</span></button>
+      <button class="mode" onclick="startQuiz('mistakes')"><div class="ico">🔁</div><b>Mijn fouten</b><span>Alleen wat eerder lastig was.</span></button>
+      <button class="mode" onclick="startQuiz('test')"><div class="ico">🏆</div><b>Eindtoets</b><span>15 vragen, geen hints. Kun jij 80% halen?</span></button>
+    </div>
+
+    <div class="sectionTitle">Jouw voortgang</div>
+    <div class="stats">
+      <div class="stat"><b id="statXp">0</b><span>XP</span></div>
+      <div class="stat"><b id="statBest">0%</b><span>beste toets</span></div>
+      <div class="stat"><b id="statMistakes">0</b><span>te oefenen</span></div>
+    </div>
+    <div class="footerNote">Je voortgang wordt alleen op dit apparaat bewaard.</div>
+  </section>
+
+  <section id="quiz" class="hidden">
+    <div class="quizTop">
+      <button class="back" onclick="goHome()">‹</button>
+      <div class="progressWrap">
+        <div class="progressText"><span id="modeLabel"></span><span id="counter"></span></div>
+        <div class="bar"><div id="progress"></div></div>
+      </div>
+    </div>
+    <div class="card" id="quizCard">
+      <span class="qtag" id="qtag"></span>
+      <div class="question" id="question"></div>
+      <div class="hint" id="hint"></div>
+      <div id="inputArea"></div>
+      <div class="actions" id="actions"></div>
+      <div id="feedback"></div>
+    </div>
+  </section>
+
+  <section id="finish" class="hidden">
+    <div class="top"><div class="brand"><div class="logo">K</div><div><h1>Ronde klaar</h1><div class="sub">Goed gewerkt</div></div></div></div>
+    <div class="card finish">
+      <div class="big" id="finishEmoji">🎉</div>
+      <h2 id="finishTitle">Nice!</h2>
+      <div class="scoreRing" id="scoreRing"><b id="finishScore">0%</b></div>
+      <p id="finishText"></p>
+      <div class="row">
+        <button class="btn btnGhost" onclick="goHome()">Home</button>
+        <button class="btn btnMain" id="retryBtn">Nog een ronde</button>
+      </div>
+      <div class="wrongList" id="wrongList"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const WORDS = [
+  ["tomato","tomaat"],["carrot","wortel"],["pepper","paprika"],["lettuce","sla"],
+  ["cucumber","komkommer"],["beef","rundvlees"],["chicken","kip"],["cheese","kaas"],
+  ["crunchy","knapperig"],["sweet","zoet"],["sour","zuur"],["soft","zacht"],
+  ["hard","hard"],["creamy","romig"],["spicy","pittig"],["greasy","vettig"],
+  ["smelly","stinkend"],["meatballs","gehaktballetjes"],["mashed potatoes","aardappelpuree"],
+  ["boil","koken"],["bake","bakken"],["cut","snijden"],["piece","stukje"]
+];
+
+const PHRASES = [
+  ["You can fill tacos with beef or chicken.","Je kunt taco's vullen met rundvlees of kip."],
+  ["Most pizzas have a crunchy crust.","De meeste pizza's hebben een knapperige korst."],
+  ["To make pancakes you need milk, butter and flour.","Om pannenkoeken te maken heb je melk, boter en meel nodig."],
+  ["This green salad has lettuce, cucumber and a lemon dressing.","In deze groene salade zit sla, komkommer en een dressing met citroen."],
+  ["You can eat it with your hands.","Je kunt het met je handen eten."],
+  ["It tastes delicious.","Het smaakt heerlijk."],
+  ["It is very healthy.","Het is heel gezond."],
+  ["Everyone likes it.","Iedereen vindt het lekker."],
+  ["You can eat it with different vegetables.","Je kunt het met verschillende groenten eten."]
+];
+
+const GRAMMAR = [
+  {q:"___ red and a bit sour.",sub:"Het gaat over 1 ding.",a:["it is","it's"],show:"It is / It's"},
+  {q:"___ not hard.",sub:"Het gaat over 1 ding.",a:["it is","it's"],show:"It is / It's"},
+  {q:"___ orange and crunchy.",sub:"Het gaat over meerdere dingen.",a:["they are","they're"],show:"They are / They're"},
+  {q:"___ not sour.",sub:"Het gaat over meerdere dingen.",a:["they are","they're"],show:"They are / They're"},
+  {q:"Maak korter: It is",sub:"Gebruik de korte Engelse vorm.",a:["it's"],show:"It's"},
+  {q:"Maak korter: They are",sub:"Gebruik de korte Engelse vorm.",a:["they're"],show:"They're"},
+  {q:"Maak korter: It is not",sub:"Zoals op je leerblad.",a:["it's not"],show:"It's not"},
+  {q:"Maak korter: They are not",sub:"Zoals op je leerblad.",a:["they're not"],show:"They're not"},
+  {q:"Kies: 1 carrot → ___ orange.",sub:"1 ding = ?",a:["it is","it's"],show:"It is / It's"},
+  {q:"Kies: carrots → ___ crunchy.",sub:"meerdere dingen = ?",a:["they are","they're"],show:"They are / They're"}
+];
+
+const state = {
+  mode:"mixed", queue:[], index:0, correct:0, wrong:[], locked:false, selected:null, sessionIds:[]
+};
+
+const store = JSON.parse(localStorage.getItem("kayleeEnglishV2") || '{"xp":0,"best":0,"mistakes":{},"rounds":0}');
+function save(){ localStorage.setItem("kayleeEnglishV2",JSON.stringify(store)); updateHome(); }
+function norm(s){ return (s||"").toLowerCase().trim().replace(/[’‘]/g,"'").replace(/[.,!?]/g,"").replace(/\s+/g," "); }
+function shuffle(a){ return [...a].sort(()=>Math.random()-.5); }
+function idFor(type,key){ return type+"::"+key; }
+
+function makeWords(){
+  const out=[];
+  WORDS.forEach(([en,nl],i)=>{
+    out.push({id:idFor("w-en",en),type:"word",tag:"Words",q:`Wat is “${nl}” in het Engels?`,hint:"Let goed op de spelling.",answers:[en],show:en});
+    out.push({id:idFor("w-nl",en),type:"mc",tag:"Words",q:`Wat betekent “${en}”?`,hint:"Kies het beste antwoord.",answer:nl,show:nl, options:shuffle([nl,...shuffle(WORDS.filter(x=>x[0]!==en).map(x=>x[1])).slice(0,3)])});
+  });
+  return out;
+}
+function makePhrases(){
+  const out=[];
+  PHRASES.forEach(([en,nl])=>{
+    out.push({id:idFor("p-en",en),type:"phrase",tag:"Phrases",q:nl,hint:"Schrijf de hele Engelse zin.",answers:[en],show:en});
+    out.push({id:idFor("p-nl",en),type:"mc",tag:"Phrases",q:en,hint:"Welke Nederlandse vertaling klopt?",answer:nl,show:nl,options:shuffle([nl,...shuffle(PHRASES.filter(x=>x[0]!==en).map(x=>x[1])).slice(0,3)])});
+  });
+  return out;
+}
+function makeGrammar(){
+  return GRAMMAR.map((g,i)=>({id:idFor("g",i),type:"grammar",tag:"Grammar",q:g.q,hint:g.sub,answers:g.a,show:g.show}));
+}
+function bank(){ return [...makeWords(),...makePhrases(),...makeGrammar()]; }
+
+function startQuiz(mode){
+  state.mode=mode; state.index=0; state.correct=0; state.wrong=[]; state.locked=false; state.selected=null;
+  let b=bank();
+  if(mode==="words") b=b.filter(x=>x.tag==="Words");
+  if(mode==="phrases") b=b.filter(x=>x.tag==="Phrases");
+  if(mode==="grammar") b=b.filter(x=>x.tag==="Grammar");
+  if(mode==="mistakes"){
+    const ids=Object.keys(store.mistakes||{}).filter(id=>store.mistakes[id]>0);
+    b=b.filter(x=>ids.includes(x.id));
+    if(!b.length){ alert("Je hebt nog geen fouten om te oefenen. Lekker bezig!"); return; }
+  }
+  if(mode==="mixed") {
+    const w=shuffle(b.filter(x=>x.tag==="Words")).slice(0,10);
+    const p=shuffle(b.filter(x=>x.tag==="Phrases")).slice(0,5);
+    const g=shuffle(b.filter(x=>x.tag==="Grammar")).slice(0,5);
+    b=[...w,...p,...g];
+  }
+  if(mode==="test"){
+    const typed=shuffle(b.filter(x=>x.type!=="mc")).slice(0,12);
+    const mc=shuffle(b.filter(x=>x.type==="mc")).slice(0,3);
+    b=[...typed,...mc];
+  }
+  const weighted=[];
+  b.forEach(q=>{weighted.push(q); const n=Math.min(store.mistakes?.[q.id]||0,2); if(mode!=="test") for(let i=0;i<n;i++) weighted.push(q);});
+  state.queue=shuffle(weighted).slice(0, mode==="test"?15:20);
+  state.sessionIds=state.queue.map(x=>x.id);
+  show("quiz"); renderQuestion();
+}
+
+function renderQuestion(){
+  state.locked=false; state.selected=null;
+  const q=state.queue[state.index];
+  if(!q){ finishQuiz(); return; }
+  document.getElementById("modeLabel").textContent=labelFor(state.mode);
+  document.getElementById("counter").textContent=(state.index+1)+" / "+state.queue.length;
+  document.getElementById("progress").style.width=(state.index/state.queue.length*100)+"%";
+  document.getElementById("qtag").textContent=q.tag;
+  document.getElementById("question").textContent=q.q;
+  document.getElementById("hint").textContent=state.mode==="test"?"Geen hints tijdens de eindtoets.":q.hint;
+  document.getElementById("feedback").innerHTML="";
+  const area=document.getElementById("inputArea");
+  const actions=document.getElementById("actions");
+  if(q.type==="mc"){
+    area.innerHTML='<div class="options">'+q.options.map((o,i)=>`<button class="option" data-i="${i}" onclick="selectOption(${i})">${esc(o)}</button>`).join("")+'</div>';
+    actions.innerHTML='<button class="btn btnMain" onclick="checkAnswer()">Controleer</button>';
+  }else{
+    area.innerHTML='<input id="answerInput" class="answer" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Typ je antwoord…">';
+    actions.innerHTML='<button class="btn btnGhost" onclick="reveal()">Weet ik niet</button><button class="btn btnMain" onclick="checkAnswer()">Controleer</button>';
+    const inp=document.getElementById("answerInput"); inp.focus(); inp.addEventListener("keydown",e=>{if(e.key==="Enter")checkAnswer();});
+  }
+}
+function selectOption(i){
+  if(state.locked)return; state.selected=i;
+  document.querySelectorAll(".option").forEach((el,j)=>el.classList.toggle("selected",j===i));
+}
+function checkAnswer(){
+  if(state.locked){ nextQuestion(); return; }
+  const q=state.queue[state.index];
+  let ok=false, user="";
+  if(q.type==="mc"){
+    if(state.selected===null)return;
+    user=q.options[state.selected]; ok=norm(user)===norm(q.answer);
+  }else{
+    user=document.getElementById("answerInput").value;
+    if(!user.trim())return;
+    ok=q.answers.some(a=>norm(a)===norm(user));
+  }
+  applyResult(ok,q,user);
+}
+function reveal(){
+  if(state.locked)return;
+  const q=state.queue[state.index];
+  applyResult(false,q,"");
+}
+function applyResult(ok,q,user){
+  state.locked=true;
+  if(ok){
+    state.correct++; store.xp=(store.xp||0)+10;
+    if(store.mistakes?.[q.id]) store.mistakes[q.id]=Math.max(0,store.mistakes[q.id]-1);
+    document.getElementById("feedback").innerHTML='<div class="feedback ok"><b>✅ Goed!</b><span class="correct">'+esc(q.show)+'</span></div>';
+  }else{
+    store.mistakes=store.mistakes||{}; store.mistakes[q.id]=(store.mistakes[q.id]||0)+1;
+    state.wrong.push(q);
+    document.getElementById("feedback").innerHTML='<div class="feedback bad"><b>Bijna — deze onthouden:</b><span class="correct">'+esc(q.show)+'</span><div class="miniNote">Deze vraag komt later vaker terug.</div></div>';
+  }
+  save();
+  document.getElementById("actions").innerHTML='<button class="btn btnMain" onclick="nextQuestion()">Volgende →</button>';
+}
+function nextQuestion(){ state.index++; renderQuestion(); }
+
+function finishQuiz(){
+  const total=state.queue.length||1, pct=Math.round(state.correct/total*100);
+  store.rounds=(store.rounds||0)+1;
+  if(state.mode==="test") store.best=Math.max(store.best||0,pct);
+  save();
+  show("finish");
+  document.getElementById("scoreRing").style.setProperty("--p",pct+"%");
+  document.getElementById("finishScore").textContent=pct+"%";
+  let emoji="🎉",title="Goed gedaan!",txt=`Je had ${state.correct} van de ${total} goed.`;
+  if(pct>=90){emoji="🌟";title="Supergoed!";txt+=" Dat zit er echt goed in."}
+  else if(pct>=80){emoji="🏆";title="Geslaagd!";txt+=" Mooie score."}
+  else if(pct>=60){emoji="💪";title="Lekker bezig!";txt+=" Nog één ronde en je bent er."}
+  else{emoji="🧠";title="Dit is precies waarom we oefenen";txt+=" De moeilijke dingen komen terug."}
+  document.getElementById("finishEmoji").textContent=emoji;
+  document.getElementById("finishTitle").textContent=title;
+  document.getElementById("finishText").textContent=txt;
+  const unique=[...new Map(state.wrong.map(q=>[q.id,q])).values()].slice(0,6);
+  document.getElementById("wrongList").innerHTML=unique.length?'<div class="sectionTitle">Nog even onthouden</div>'+unique.map(q=>`<div class="wrongItem"><b>${esc(q.show)}</b><span>${esc(q.q)}</span></div>`).join(""):"";
+  document.getElementById("retryBtn").onclick=()=>startQuiz(state.mode);
+}
+function labelFor(m){return({mixed:"Alles door elkaar",words:"Words",phrases:"Phrases",grammar:"Grammar",mistakes:"Mijn fouten",test:"Eindtoets"})[m]||m}
+function show(id){["home","quiz","finish"].forEach(x=>document.getElementById(x).classList.toggle("hidden",x!==id));window.scrollTo({top:0,behavior:"smooth"});}
+function goHome(){show("home");updateHome();}
+function updateHome(){
+  document.getElementById("homeScore").textContent="⭐ "+(store.xp||0)+" XP";
+  document.getElementById("statXp").textContent=store.xp||0;
+  document.getElementById("statBest").textContent=(store.best||0)+"%";
+  const n=Object.values(store.mistakes||{}).filter(v=>v>0).length;
+  document.getElementById("statMistakes").textContent=n;
+  document.getElementById("streakText").textContent=(store.rounds||0)?`${store.rounds} ronde${store.rounds===1?"":"s"} geoefend`:"Start je eerste ronde";
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+updateHome();
+</script>
+</body>
+</html>
