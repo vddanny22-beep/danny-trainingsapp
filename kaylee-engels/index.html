@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#6d5dfc">
+  <title>Kaylee English</title>
+  <style>
+    :root{
+      --bg:#f6f7fb;--card:#fff;--ink:#18212f;--muted:#6d7686;--brand:#6d5dfc;--brand2:#8b7cff;
+      --good:#18864b;--bad:#c53b4a;--line:#e6e9f0;--soft:#f0efff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#f7f7ff 0,#f6f7fb 34%,#eef2f8 100%);color:var(--ink);min-height:100vh}
+    .app{max-width:760px;margin:0 auto;padding:20px 16px 40px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+    .brand h1{font-size:24px;margin:0 0 4px}.brand p{margin:0;color:var(--muted);font-size:14px}
+    .pill{background:#fff;border:1px solid var(--line);padding:8px 12px;border-radius:999px;font-weight:700;font-size:13px;white-space:nowrap}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:0 12px 32px rgba(28,38,58,.08);padding:18px}
+    .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .mode{border:1px solid var(--line);border-radius:18px;padding:16px;background:#fff;text-align:left;cursor:pointer;min-height:116px}
+    .mode strong{display:block;font-size:17px;margin-bottom:6px}.mode span{font-size:13px;color:var(--muted)}
+    .mode.primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:none}.mode.primary span{color:#ece9ff}
+    .progress-wrap{margin:4px 0 18px}.progress-head{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;margin-bottom:8px}.bar{height:10px;background:#eceef4;border-radius:999px;overflow:hidden}.bar>div{height:100%;background:linear-gradient(90deg,var(--brand),#9a8cff);width:0%;transition:.25s}
+    .qtype{display:inline-block;background:var(--soft);color:#5144d7;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;margin-bottom:12px}
+    .question{font-size:24px;font-weight:800;line-height:1.25;margin:6px 0 14px}
+    .hint{font-size:14px;color:var(--muted);margin-bottom:14px}
+    input{width:100%;font-size:18px;padding:15px 16px;border-radius:14px;border:1.5px solid #ccd2dc;outline:none}
+    input:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(109,93,252,.12)}
+    .answers{display:grid;gap:10px}
+    .choice{padding:14px 16px;border-radius:14px;border:1.5px solid #d6dbe5;background:white;text-align:left;font-size:16px;cursor:pointer}
+    .actions{display:flex;gap:10px;margin-top:14px}.btn{flex:1;border:0;border-radius:14px;padding:14px 16px;font-weight:800;font-size:15px;cursor:pointer}.btn.primary{background:var(--brand);color:#fff}.btn.secondary{background:#eef0f5;color:#283243}.btn:disabled{opacity:.5;cursor:not-allowed}
+    .feedback{margin-top:14px;border-radius:14px;padding:12px 14px;font-weight:700;display:none}.feedback.good{display:block;background:#e9f7ef;color:var(--good)}.feedback.bad{display:block;background:#fdecef;color:var(--bad)}
+    .summary{text-align:center}.score{font-size:52px;font-weight:900;margin:6px 0}.muted{color:var(--muted)}.errors{margin-top:18px;text-align:left}.errors .item{padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+    .small{font-size:12px;color:var(--muted)}
+    .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+    @media(max-width:560px){.home-grid{grid-template-columns:1fr}.question{font-size:22px}.app{padding-top:14px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand"><h1>Kaylee English</h1><p>Food, phrases & grammar</p></div>
+    <div class="pill" id="streak">0 goed</div>
+  </div>
+
+  <section id="home" class="card">
+    <h2 style="margin-top:0">Hi Kaylee 👋</h2>
+    <p class="muted">Kies wat je wilt oefenen. Foute antwoorden komen later automatisch terug.</p>
+    <div class="home-grid">
+      <button class="mode primary" onclick="start('mixed')"><strong>Alles door elkaar</strong><span>Woorden, zinnen en grammar</span></button>
+      <button class="mode" onclick="start('words')"><strong>Woorden</strong><span>Nederlands ↔ Engels</span></button>
+      <button class="mode" onclick="start('phrases')"><strong>Phrases</strong><span>Zinnen begrijpen</span></button>
+      <button class="mode" onclick="start('grammar')"><strong>Grammar</strong><span>It is / They are</span></button>
+      <button class="mode" onclick="start('mistakes')"><strong>Mijn fouten</strong><span>Alleen wat nog lastig is</span></button>
+      <button class="mode" onclick="start('test')"><strong>Eindtoets</strong><span>20 vragen, geen hints</span></button>
+    </div>
+    <div class="footer-note">Voortgang wordt alleen op dit apparaat opgeslagen.</div>
+  </section>
+
+  <section id="quiz" class="card" style="display:none">
+    <div class="progress-wrap">
+      <div class="progress-head"><span id="count"></span><span id="scoreNow"></span></div>
+      <div class="bar"><div id="bar"></div></div>
+    </div>
+    <div id="qtype" class="qtype"></div>
+    <div id="question" class="question"></div>
+    <div id="hint" class="hint"></div>
+    <div id="inputWrap">
+      <input id="answer" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Typ je antwoord…">
+    </div>
+    <div id="choiceWrap" class="answers" style="display:none"></div>
+    <div id="feedback" class="feedback"></div>
+    <div class="actions">
+      <button class="btn secondary" onclick="goHome()">Stoppen</button>
+      <button id="checkBtn" class="btn primary" onclick="check()">Controleren</button>
+      <button id="nextBtn" class="btn primary" onclick="next()" style="display:none">Volgende</button>
+    </div>
+  </section>
+
+  <section id="done" class="card summary" style="display:none">
+    <div class="qtype">Klaar!</div>
+    <div class="score" id="finalScore">0%</div>
+    <h2 id="finalTitle">Goed gedaan!</h2>
+    <p class="muted" id="finalText"></p>
+    <div class="errors" id="errorList"></div>
+    <div class="actions">
+      <button class="btn secondary" onclick="goHome()">Terug</button>
+      <button class="btn primary" onclick="start('mistakes')">Oefen mijn fouten</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const WORDS = [
+ ['tomato','tomaat'],['carrot','wortel'],['pepper','paprika'],['lettuce','sla'],['cucumber','komkommer'],
+ ['beef','rundvlees'],['chicken','kip'],['cheese','kaas'],['crunchy','knapperig'],['sweet','zoet'],
+ ['sour','zuur'],['soft','zacht'],['hard','hard'],['creamy','romig'],['spicy','pittig'],['greasy','vettig'],
+ ['smelly','stinkend'],['meatballs','gehaktballetjes'],['mashed potatoes','aardappelpuree'],['boil','koken'],
+ ['bake','bakken'],['cut','snijden'],['piece','stukje']
+];
+
+const PHRASES = [
+ ['You can fill tacos with beef or chicken.','Je kunt taco\'s vullen met rundvlees of kip.'],
+ ['Most pizzas have a crunchy crust.','De meeste pizza\'s hebben een knapperige korst.'],
+ ['To make pancakes you need milk, butter and flour.','Om pannenkoeken te maken heb je melk, boter en meel nodig.'],
+ ['This green salad has lettuce, cucumber and a lemon dressing.','In deze groene salade zit sla, komkommer en een dressing met citroen.'],
+ ['You can eat it with your hands.','Je kunt het met je handen eten.'],
+ ['It tastes delicious.','Het smaakt heerlijk.'],
+ ['It is very healthy.','Het is heel gezond.'],
+ ['Everyone likes it.','Iedereen vindt het lekker.'],
+ ['You can eat it with different vegetables.','Je kunt het met verschillende groenten eten.']
+];
+
+const GRAMMAR = [
+ {q:'___ red and a bit sour. (1 tomato)',a:'it is',alts:["it's"],h:'Bij 1 ding gebruik je it is.'},
+ {q:'___ orange and crunchy. (carrots)',a:'they are',alts:["they're"],h:'Bij meerdere dingen gebruik je they are.'},
+ {q:'___ not hard. (1 piece of cheese)',a:'it is',alts:["it's"],h:'1 ding = it is.'},
+ {q:'___ not sour. (potatoes)',a:'they are',alts:["they're"],h:'Meerdere dingen = they are.'},
+ {q:'Maak korter: It is',a:"it's",alts:[],h:'Gebruik een apostrof.'},
+ {q:'Maak korter: They are',a:"they're",alts:[],h:'Gebruik een apostrof.'},
+ {q:'Maak korter: It is not',a:"it's not",alts:["it isn't"],h:''},
+ {q:'Maak korter: They are not',a:"they're not",alts:["they aren't"],h:''}
+];
+
+let queue=[], current=null, idx=0, correct=0, wrong=[];
+let mode='mixed', awaiting=false;
+
+function norm(s){
+ return s.toLowerCase().trim().replace(/[.,!?]/g,'').replace(/\s+/g,' ').replace(/[’]/g,"'");
+}
+function shuffle(a){ return [...a].sort(()=>Math.random()-.5); }
+
+function wordQuestions(){
+ const q=[];
+ WORDS.forEach(([en,nl])=>{
+   q.push({type:'Woord',q:'Wat is “'+nl+'” in het Engels?',a:en,alts:[],h:''});
+   q.push({type:'Woord',q:'Wat betekent “'+en+'”?',a:nl,alts:[],h:''});
+ });
+ return q;
+}
+function phraseQuestions(){
+ return PHRASES.map(([en,nl])=>({type:'Phrase',q:'Wat betekent:',lead:en,a:nl,alts:[],h:''}));
+}
+function grammarQuestions(){ return GRAMMAR.map(x=>({type:'Grammar',...x})); }
+
+function start(m){
+ mode=m; correct=0; wrong=[]; idx=0; awaiting=false;
+ let base=[];
+ if(m==='words') base=shuffle(wordQuestions()).slice(0,20);
+ if(m==='phrases') base=shuffle(phraseQuestions());
+ if(m==='grammar') base=shuffle(grammarQuestions());
+ if(m==='mixed') base=shuffle([...wordQuestions(),...phraseQuestions(),...grammarQuestions()]).slice(0,25);
+ if(m==='test') base=shuffle([...wordQuestions(),...phraseQuestions(),...grammarQuestions()]).slice(0,20).map(x=>({...x,h:''}));
+ if(m==='mistakes'){
+   const saved=JSON.parse(localStorage.getItem('kaylee_mistakes')||'[]');
+   base=saved.length?saved:shuffle([...wordQuestions(),...grammarQuestions()]).slice(0,10);
+ }
+ queue=base;
+ document.getElementById('home').style.display='none';
+ document.getElementById('done').style.display='none';
+ document.getElementById('quiz').style.display='block';
+ render();
+}
+
+function render(){
+ if(idx>=queue.length){ finish(); return; }
+ current=queue[idx]; awaiting=false;
+ document.getElementById('qtype').textContent=current.type;
+ document.getElementById('question').innerHTML=(current.lead?current.q+'<br><span style="font-size:19px;font-weight:700;color:#5144d7">'+current.lead+'</span>':current.q);
+ document.getElementById('hint').textContent=(mode==='test'?'':(current.h||''));
+ document.getElementById('answer').value='';
+ document.getElementById('answer').disabled=false;
+ document.getElementById('feedback').className='feedback';
+ document.getElementById('feedback').textContent='';
+ document.getElementById('checkBtn').style.display='block';
+ document.getElementById('nextBtn').style.display='none';
+ document.getElementById('count').textContent=(idx+1)+' / '+queue.length;
+ document.getElementById('scoreNow').textContent=correct+' goed';
+ document.getElementById('bar').style.width=((idx/queue.length)*100)+'%';
+ setTimeout(()=>document.getElementById('answer').focus(),100);
+}
+
+function check(){
+ if(awaiting) return;
+ const val=norm(document.getElementById('answer').value);
+ if(!val) return;
+ const accepted=[current.a,...(current.alts||[])].map(norm);
+ const ok=accepted.includes(val);
+ awaiting=true;
+ document.getElementById('answer').disabled=true;
+ document.getElementById('checkBtn').style.display='none';
+ document.getElementById('nextBtn').style.display='block';
+ const fb=document.getElementById('feedback');
+ if(ok){
+   correct++;
+   fb.className='feedback good';
+   fb.textContent='Goed! ✓';
+ } else {
+   wrong.push(current);
+   fb.className='feedback bad';
+   fb.innerHTML='Bijna. Het goede antwoord is: <strong>'+current.a+'</strong>';
+   if(mode!=='test') queue.push({...current,repeat:true});
+ }
+ document.getElementById('scoreNow').textContent=correct+' goed';
+ document.getElementById('streak').textContent=correct+' goed';
+}
+
+function next(){ idx++; render(); }
+
+function finish(){
+ document.getElementById('quiz').style.display='none';
+ document.getElementById('done').style.display='block';
+ const total=Math.max(1,idx);
+ const pct=Math.round(correct/total*100);
+ document.getElementById('finalScore').textContent=pct+'%';
+ document.getElementById('finalTitle').textContent=pct>=85?'Super gedaan!':pct>=65?'Goed bezig!':'Nog even oefenen';
+ document.getElementById('finalText').textContent='Je had '+correct+' van de '+total+' vragen goed.';
+ const unique=[];
+ const seen=new Set();
+ wrong.forEach(x=>{const k=x.type+'|'+x.q+'|'+(x.lead||'');if(!seen.has(k)){seen.add(k);unique.push(x)}});
+ localStorage.setItem('kaylee_mistakes',JSON.stringify(unique.slice(0,50)));
+ localStorage.setItem('kaylee_best',String(Math.max(Number(localStorage.getItem('kaylee_best')||0),pct)));
+ document.getElementById('errorList').innerHTML=unique.length
+   ? '<h3>Deze nog oefenen</h3>'+unique.slice(0,8).map(x=>'<div class="item"><strong>'+x.q+'</strong><br><span class="small">'+(x.lead?x.lead+' → ':'')+x.a+'</span></div>').join('')
+   : '<p>Geen fouten. Netjes!</p>';
+}
+
+function goHome(){
+ document.getElementById('quiz').style.display='none';
+ document.getElementById('done').style.display='none';
+ document.getElementById('home').style.display='block';
+}
+document.getElementById('answer').addEventListener('keydown',e=>{
+ if(e.key==='Enter'){ awaiting?next():check(); }
+});
+</script>
+</body>
+</html>
