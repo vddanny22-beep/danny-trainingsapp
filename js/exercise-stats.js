@@ -117,3 +117,45 @@ export function exerciseFlags(history, n = 4) {
   if (sameWeight && totalReps.every((r, i) => i === 0 || r < totalReps[i - 1])) flags.push("teruglopende reps op hetzelfde gewicht");
   return flags;
 }
+
+// Personal records, computed from the history (never stored, so editing or
+// deleting a session can't leave a stale record behind). Per logged entry,
+// compared against every EARLIER entry of the same exercise:
+//   - "weight": heavier than any set ever before;
+//   - "e1rm":   otherwise, a better estimated 1RM than ever before — e.g.
+//               more reps at the same weight.
+// The first time an exercise is logged sets the baseline; it isn't a record.
+// Returns Map<sessionId, [{ exerciseName, type, value, previous, date }]>.
+export function recordsBySession(sessions) {
+  const chronological = [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const best = new Map(); // name -> { weight, e1rm }
+  const result = new Map();
+  for (const session of chronological) {
+    for (const entry of session.entries || []) {
+      if (!entry.sets?.length) continue;
+      const weight = Math.max(...entry.sets.map((s) => s.weight));
+      const e1rm = bestOneRepMax(entry);
+      const prev = best.get(entry.exerciseName);
+      if (prev) {
+        let record = null;
+        if (weight > prev.weight) record = { type: "weight", value: weight, previous: prev.weight };
+        else if (e1rm > prev.e1rm) record = { type: "e1rm", value: e1rm, previous: prev.e1rm };
+        if (record) {
+          if (!result.has(session.id)) result.set(session.id, []);
+          result.get(session.id).push({ exerciseName: entry.exerciseName, date: session.date, ...record });
+        }
+        best.set(entry.exerciseName, { weight: Math.max(prev.weight, weight), e1rm: Math.max(prev.e1rm, e1rm) });
+      } else {
+        best.set(entry.exerciseName, { weight, e1rm });
+      }
+    }
+  }
+  return result;
+}
+
+export function formatRecord(record) {
+  const delta = Math.round((record.value - record.previous) * 10) / 10;
+  return record.type === "weight"
+    ? `${record.exerciseName}: zwaarste gewicht ooit — ${record.value} kg (+${delta})`
+    : `${record.exerciseName}: sterker dan ooit — geschat 1RM ${record.value} kg (+${delta})`;
+}

@@ -2,6 +2,7 @@ import * as storage from "./storage.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { formatRir, RIR_OPTIONS } from "./progression.js";
 import { formatCardio } from "./formatters.js";
+import { recordsBySession } from "./exercise-stats.js";
 import { confirmDialog } from "./ui-dialog.js";
 import { showToast } from "./ui-toast.js";
 
@@ -22,10 +23,10 @@ export async function renderHistoryView(container) {
     return;
   }
 
-  container.appendChild(renderSessionList(sessions, container));
+  container.appendChild(renderSessionList(sessions, container, recordsBySession(sessions)));
 }
 
-function renderSessionList(sessions, container) {
+function renderSessionList(sessions, container, records) {
   const section = document.createElement("section");
   const heading = document.createElement("h3");
   heading.textContent = "Sessies";
@@ -33,7 +34,7 @@ function renderSessionList(sessions, container) {
 
   const list = document.createElement("ul");
   list.className = "session-list";
-  sessions.forEach((session) => list.appendChild(renderSessionItem(session, container)));
+  sessions.forEach((session) => list.appendChild(renderSessionItem(session, container, records.get(session.id) || [])));
   section.appendChild(list);
   return section;
 }
@@ -46,7 +47,7 @@ function formatSessionDate(session) {
   });
 }
 
-function renderSessionItem(session, container) {
+function renderSessionItem(session, container, records) {
   const item = document.createElement("li");
   item.className = "session-item";
 
@@ -55,7 +56,8 @@ function renderSessionItem(session, container) {
 
   const summary = document.createElement("div");
   summary.className = "session-summary";
-  summary.textContent = `${formatSessionDate(session)} — ${session.dayName} (${session.entries.length} oefeningen)`;
+  summary.textContent = `${formatSessionDate(session)} — ${session.dayName} (${session.entries.length} oefeningen)${records.length ? ` · 🏆 ${records.length}` : ""}`;
+  if (records.length) summary.title = records.map((r) => r.exerciseName).join(", ");
   header.appendChild(summary);
 
   const editBtn = smallButton("Bewerken", () => {

@@ -2,7 +2,14 @@ import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
 import { volumeByWeek, volumeByCategory, percentChange, weeklyTrend } from "./volume-stats.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
-import { historyByExercise, summariseExercise, trainingOverview, hasProgressed } from "./exercise-stats.js";
+import { historyByExercise, summariseExercise, trainingOverview, hasProgressed, recordsBySession, formatRecord } from "./exercise-stats.js";
+import {
+  MUSCLES, makeMuscleResolver, recentMuscleSets, plannedMuscleSets, volumeStatus, formatSets,
+} from "./muscles.js";
+import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
+import {
+  getTargets, setTargets, latestWeightKg, dailyAverages, dailySeries,
+} from "./daily-log.js";
 import { formatSetsLine } from "./formatters.js";
 import { formatRir } from "./progression.js";
 
@@ -37,7 +44,11 @@ export async function renderProgressView(container) {
   if (recompHint) container.appendChild(recompHint);
 
   container.appendChild(renderTrainingOverview(sessions));
+  container.appendChild(renderMuscleSection(sessions, days));
+  const recordsSection = renderRecordsSection(sessions);
+  if (recordsSection) container.appendChild(recordsSection);
   container.appendChild(renderExerciseProgress(sessions, days));
+  container.appendChild(await renderDailySection(container, logs));
 
   container.appendChild(await renderBodyLogSection(container, logs));
   container.appendChild(await renderPhotoSection(container));
@@ -239,6 +250,202 @@ function renderExerciseCard(name, history, exercise) {
   });
   if (history.length >= 2) card.appendChild(renderSparkline(e1rmRelevant ? s.e1rmSeries : s.weightSeries));
   return card;
+}
+
+const STATUS_TEXT = { none: "niet getraind", low: "onder doel", ok: "op doel", high: "boven doel" };
+
+// Body map + list: hard sets per muscle group, rolling 7 days or what the
+// schema plans per week, against a hypertrophy target range per muscle.
+function renderMuscleSection(sessions, days) {
+  const section = document.createElement("section");
+  section.className = "trend-section muscle-section";
+
+  const heading = document.createElement("h3");
+  heading.className = "overview-heading";
+  heading.textContent = "Spieren";
+  section.appendChild(heading);
+
+  const resolve = makeMuscleResolver(days);
+  const views = {
+    recent: { label: "Laatste 7 dagen", sets: recentMuscleSets(sessions, resolve) },
+    planned: { label: "Volgens schema", sets: plannedMuscleSets(days) },
+  };
+
+  const toggle = document.createElement("div");
+  toggle.className = "segmented";
+  toggle.setAttribute("role", "group");
+  toggle.setAttribute("aria-label", "Spierkaart weergave");
+  const mapSlot = document.createElement("div");
+  mapSlot.className = "body-map-slot";
+  const list = document.createElement("div");
+  list.className = "muscle-list";
+
+  const show = (key) => {
+    const view = views[key];
+    toggle.querySelectorAll("button").forEach((b) => {
+      const active = b.dataset.view === key;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
+    mapSlot.innerHTML = "";
+    mapSlot.appendChild(renderBodyMap(view.sets, { label: `Spierkaart, ${view.label.toLowerCase()}` }));
+    mapSlot.appendChild(renderBodyMapLegend());
+    renderMuscleList(list, view.sets);
+  };
+  Object.entries(views).forEach(([key, view]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.view = key;
+    btn.textContent = view.label;
+    btn.addEventListener("click", () => show(key));
+    toggle.appendChild(btn);
+  });
+
+  section.appendChild(toggle);
+  section.appendChild(mapSlot);
+  const caption = document.createElement("p");
+  caption.className = "sync-help";
+  caption.textContent = "Harde sets per spiergroep: hoofdspier telt 1, hulpspier ½. Doel voor spiergroei meestal ±10–20 sets per week.";
+  section.appendChild(caption);
+  section.appendChild(list);
+  show("recent");
+  return section;
+}
+
+function renderMuscleList(list, setsByMuscle) {
+  list.innerHTML = "";
+  MUSCLES.forEach(({ key, label, target }) => {
+    const sets = setsByMuscle[key] || 0;
+    const status = volumeStatus(key, sets);
+    const row = document.createElement("div");
+    row.className = `muscle-row${status ? ` status-${status}` : ""}`;
+
+    const name = document.createElement("span");
+    name.className = "muscle-row-name";
+    name.textContent = label;
+    row.appendChild(name);
+
+    const value = document.createElement("span");
+    value.className = "muscle-row-value";
+    value.textContent = target ? `${formatSets(sets)} / ${target[0]}–${target[1]}` : formatSets(sets);
+    row.appendChild(value);
+
+    if (status) {
+      const chip = document.createElement("span");
+      chip.className = "muscle-row-status";
+      chip.textContent = STATUS_TEXT[status];
+      row.appendChild(chip);
+    }
+    list.appendChild(row);
+  });
+}
+
+// Records from the last 30 days, newest first; omitted when there are none.
+function renderRecordsSection(sessions) {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const records = [...recordsBySession(sessions).values()]
+    .flat()
+    .filter((r) => new Date(r.date).getTime() >= cutoff)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  if (!records.length) return null;
+
+  const section = document.createElement("section");
+  section.className = "trend-section";
+  const heading = document.createElement("h3");
+  heading.className = "overview-heading";
+  heading.textContent = `🏆 Records (30 dagen): ${records.length}`;
+  section.appendChild(heading);
+  records.slice(0, 10).forEach((record) => {
+    const line = document.createElement("p");
+    line.className = "records-line";
+    line.textContent = `${formatShortDate(record.date)} — ${formatRecord(record)}`;
+    section.appendChild(line);
+  });
+  return section;
+}
+
+// Protein and steps: 7-day averages against the daily targets, a 14-day trend,
+// and the targets themselves (editable).
+async function renderDailySection(rootContainer, bodyLogs) {
+  const section = document.createElement("section");
+  section.className = "trend-section";
+  const heading = document.createElement("h3");
+  heading.className = "overview-heading";
+  heading.textContent = "Eiwit & stappen";
+  section.appendChild(heading);
+
+  const logs = await storage.getDailyLogs();
+  const weight = bodyLogs.find((l) => l.weightKg != null)?.weightKg ?? (await latestWeightKg());
+  const targets = getTargets(weight);
+  const averages = dailyAverages(logs);
+
+  const grid = document.createElement("div");
+  grid.className = "stat-row stat-grid";
+  grid.appendChild(renderOverviewCard(
+    "Eiwit (gem. 7 d)",
+    averages.protein ? `${averages.protein.avg} g` : "–",
+    `doel ${targets.proteinG} g${averages.protein ? ` · ${averages.protein.days} d gelogd` : ""}`
+  ));
+  grid.appendChild(renderOverviewCard(
+    "Stappen (gem. 7 d)",
+    averages.steps ? averages.steps.avg.toLocaleString("nl-NL") : "–",
+    `doel ${targets.steps.toLocaleString("nl-NL")}${averages.steps ? ` · ${averages.steps.days} d gelogd` : ""}`
+  ));
+  section.appendChild(grid);
+
+  const proteinSeries = dailySeries(logs, "proteinG");
+  const stepsSeries = dailySeries(logs, "steps");
+  if (proteinSeries.filter((v) => v > 0).length >= 2) {
+    const label = document.createElement("div");
+    label.className = "progress-sublabel";
+    label.textContent = "Eiwit, laatste 14 dagen";
+    section.append(label, renderSparkline(proteinSeries, { area: true }));
+  }
+  if (stepsSeries.filter((v) => v > 0).length >= 2) {
+    const label = document.createElement("div");
+    label.className = "progress-sublabel";
+    label.textContent = "Stappen, laatste 14 dagen";
+    section.append(label, renderSparkline(stepsSeries, { area: true }));
+  }
+
+  const form = document.createElement("form");
+  form.className = "inline-form daily-targets";
+  form.noValidate = true;
+  const proteinInput = makeDecimalInput("inline-form-input", String(targets.proteinG));
+  proteinInput.value = targets.proteinG;
+  const stepsInput = makeDecimalInput("inline-form-input", String(targets.steps));
+  stepsInput.inputMode = "numeric";
+  stepsInput.value = targets.steps;
+  const row = (text, input) => {
+    const label = document.createElement("label");
+    label.className = "inline-form-row";
+    const caption = document.createElement("span");
+    caption.textContent = text;
+    label.append(caption, input);
+    return label;
+  };
+  form.appendChild(row("Eiwitdoel (g/dag)", proteinInput));
+  form.appendChild(row("Stappendoel", stepsInput));
+  const hint = document.createElement("p");
+  hint.className = "sync-help";
+  hint.textContent = targets.proteinIsDerived
+    ? `Eiwitdoel nu automatisch: 2 g per kg van je laatste gewicht (${weight} kg).`
+    : "Eigen doelen ingesteld.";
+  form.appendChild(hint);
+  const save = document.createElement("button");
+  save.type = "submit";
+  save.className = "btn btn-small btn-accent";
+  save.textContent = "Doelen opslaan";
+  form.appendChild(save);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const proteinG = Math.round(parseDecimal(proteinInput.value));
+    const steps = Math.round(parseDecimal(stepsInput.value.replace(/\./g, "")));
+    setTargets({ proteinG: proteinG > 0 ? proteinG : null, steps: steps > 0 ? steps : null });
+    renderProgressView(rootContainer);
+  });
+  section.appendChild(form);
+  return section;
 }
 
 const WEEKS_SHOWN = 12;

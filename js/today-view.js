@@ -8,6 +8,10 @@ import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { showToast } from "./ui-toast.js";
 import { renderProgressRing, updateProgressRing } from "./progress-ring.js";
 import { formatSetsLine, formatCardio } from "./formatters.js";
+import { renderDailyCard } from "./daily-log.js";
+import { recordsBySession, formatRecord } from "./exercise-stats.js";
+import { makeMuscleResolver, sessionMuscleSets } from "./muscles.js";
+import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
 
 // Every render bumps this; a render that finds it changed after an await has
 // been overtaken (e.g. the day picker changed while it was still loading the
@@ -134,6 +138,9 @@ async function renderForDay(container, days, selectedDayId) {
   const totalSets = day.exercises.reduce((sum, ex) => sum + ex.sets, 0);
   const { hero, ringSvg } = renderHero(day, totalSets);
   container.appendChild(hero);
+  const dailyCard = await renderDailyCard();
+  if (token !== renderToken) return;
+  container.appendChild(dailyCard);
 
   const picker = document.createElement("select");
   picker.className = "day-picker";
@@ -222,9 +229,14 @@ async function renderForDay(container, days, selectedDayId) {
     await storage.saveSession(session);
     stopRestTimer(); // workout logged — no set left to rest between
     clearDraft(); // it's a real session now, not something still in progress
-    navigator.vibrate?.(20);
     status.textContent = "Opgeslagen. Volgende keer suggereert de app het nieuwe gewicht.";
-    showToast("Sessie opgeslagen");
+
+    // Records are computed over the whole history including this session,
+    // so a backdated or edited session elsewhere can't fake one.
+    const records = recordsBySession(await storage.getSessions()).get(session.id) || [];
+    navigator.vibrate?.(records.length ? [30, 60, 30] : 20);
+    showToast(records.length ? `Sessie opgeslagen — ${records.length} ${records.length === 1 ? "nieuw record" : "nieuwe records"}!` : "Sessie opgeslagen");
+    form.appendChild(renderWorkoutSummary(session, records, days));
 
     // The old behaviour left a permanently dead button here: pressing save
     // again would log a duplicate session, but there was also no way forward
@@ -239,6 +251,37 @@ async function renderForDay(container, days, selectedDayId) {
   });
 
   container.appendChild(form);
+}
+
+// Shown under the form after saving: new records first (the moment they
+// matter), then which muscles this workout hit.
+function renderWorkoutSummary(session, records, days) {
+  const wrap = document.createElement("section");
+  wrap.className = "workout-summary";
+
+  if (records.length) {
+    const box = document.createElement("div");
+    box.className = "records-box";
+    const title = document.createElement("p");
+    title.className = "records-title";
+    title.textContent = records.length === 1 ? "🏆 Nieuw record" : `🏆 ${records.length} nieuwe records`;
+    box.appendChild(title);
+    records.forEach((record) => {
+      const line = document.createElement("p");
+      line.className = "records-line";
+      line.textContent = formatRecord(record);
+      box.appendChild(line);
+    });
+    wrap.appendChild(box);
+  }
+
+  const heading = document.createElement("p");
+  heading.className = "progress-label";
+  heading.textContent = "Getrainde spieren";
+  wrap.appendChild(heading);
+  wrap.appendChild(renderBodyMap(sessionMuscleSets(session, makeMuscleResolver(days)), { label: "Spierkaart van deze training", fullAt: 4 }));
+  wrap.appendChild(renderBodyMapLegend("weinig", "veel sets"));
+  return wrap;
 }
 
 // Raw form contents, including half-filled rows — unlike buildSessionFromForm,

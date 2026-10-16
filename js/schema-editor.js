@@ -10,6 +10,7 @@ import { showToast } from "./ui-toast.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { incrementFor } from "./progression.js";
 import { getSchemaSnapshot, restoreSchemaSnapshot } from "./migrations.js";
+import { MUSCLES, musclesFor, defaultMusclesFor } from "./muscles.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -66,7 +67,7 @@ function renderBackupSettings() {
 
   const help = document.createElement("p");
   help.className = "sync-help";
-  help.textContent = "Al je gegevens staan alleen op dit toestel. Maak een back-upbestand met je schema, sessies, metingen en foto's — bewaar dat ergens veilig, en zet het terug als je een nieuwe telefoon hebt.";
+  help.textContent = "Al je gegevens staan alleen op dit toestel. Maak een back-upbestand met je schema, sessies, metingen, eiwit/stappen en foto's — bewaar dat ergens veilig, en zet het terug als je een nieuwe telefoon hebt.";
   section.appendChild(help);
 
   const status = document.createElement("p");
@@ -106,7 +107,7 @@ function renderBackupSettings() {
     // right here.
     const confirmed = await confirmDialog({
       title: "Back-up terugzetten",
-      body: "Terugzetten vervangt je huidige schema, sessies, metingen en foto's door die uit het back-upbestand. Doorgaan?",
+      body: "Terugzetten vervangt je huidige schema, sessies, metingen, eiwit/stappen en foto's door die uit het back-upbestand. Doorgaan?",
       confirmLabel: "Terugzetten",
       danger: true,
     });
@@ -419,6 +420,21 @@ function renderDayCard(day, rootContainer, days, index) {
   return card;
 }
 
+// Which muscles an exercise trains belongs to the movement, not to one day:
+// Push and Push 2 each hold their own "Chest Press". Copy the setting to every
+// same-named exercise on other days so the body map can't disagree with itself.
+async function syncMusclesByName(savedDayId, name, muscles) {
+  const days = await storage.getDays();
+  for (const day of days) {
+    if (day.id === savedDayId) continue;
+    if (!day.exercises.some((e) => e.name === name)) continue;
+    await storage.saveDay({
+      ...day,
+      exercises: day.exercises.map((e) => (e.name === name ? { ...e, muscles } : e)),
+    });
+  }
+}
+
 function renderExerciseRow(day, exercise, rootContainer, index) {
   const row = document.createElement("li");
   row.className = "exercise-row";
@@ -446,6 +462,7 @@ function renderExerciseRow(day, exercise, rootContainer, index) {
           e.id === exercise.id ? { ...e, ...values } : e
         );
         await storage.saveDay({ ...day, exercises: updatedExercises });
+        await syncMusclesByName(day.id, values.name, values.muscles);
         renderSchemaEditor(rootContainer);
       },
     }));
@@ -542,6 +559,70 @@ function focusOnInsert(input) {
   requestAnimationFrame(() => input.focus());
 }
 
+// Tri-state chips per muscle group: tap cycles off → hoofdspier → hulpspier.
+// Feeds the body map and weekly volume (muscles.js).
+function renderMusclePicker(initial) {
+  const wrap = document.createElement("div");
+  wrap.className = "muscle-picker";
+  const caption = document.createElement("p");
+  caption.className = "inline-form-caption";
+  caption.textContent = "Spieren (tik: hoofd → hulp → uit)";
+  wrap.appendChild(caption);
+
+  const state = new Map();
+  const chips = document.createElement("div");
+  chips.className = "muscle-chips";
+  const buttons = new Map();
+  const paint = (key) => {
+    const btn = buttons.get(key);
+    const value = state.get(key) || "off";
+    btn.dataset.state = value;
+    btn.setAttribute("aria-pressed", String(value !== "off"));
+    btn.querySelector(".muscle-chip-role").textContent = value === "primary" ? "hoofd" : value === "secondary" ? "hulp" : "";
+  };
+  const api = {
+    el: wrap,
+    touched: false,
+    set(muscles) {
+      state.clear();
+      muscles.primary.forEach((m) => state.set(m, "primary"));
+      muscles.secondary.forEach((m) => { if (!state.has(m)) state.set(m, "secondary"); });
+      buttons.forEach((_, key) => paint(key));
+    },
+    get() {
+      const primary = [];
+      const secondary = [];
+      state.forEach((value, key) => {
+        if (value === "primary") primary.push(key);
+        if (value === "secondary") secondary.push(key);
+      });
+      return { primary, secondary };
+    },
+  };
+  MUSCLES.forEach(({ key, label }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "muscle-chip";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const role = document.createElement("span");
+    role.className = "muscle-chip-role";
+    btn.append(name, role);
+    btn.addEventListener("click", () => {
+      const next = { off: "primary", primary: "secondary", secondary: "off" }[state.get(key) || "off"];
+      if (next === "off") state.delete(key);
+      else state.set(key, next);
+      api.touched = true;
+      paint(key);
+    });
+    buttons.set(key, btn);
+    chips.appendChild(btn);
+  });
+  wrap.appendChild(chips);
+  api.set(initial);
+  return api;
+}
+
 // One text field, shared by "add day" and "rename day".
 function renderDayNameForm({ value = "", submitLabel, onSubmit, onCancel }) {
   const form = document.createElement("form");
@@ -598,6 +679,14 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
   form.appendChild(formRow("Reps max.", repMaxInput));
   form.appendChild(formRow("Stap (kg)", incrementInput));
 
+  const musclePicker = renderMusclePicker(exercise ? musclesFor(exercise) : defaultMusclesFor(""));
+  form.appendChild(musclePicker.el);
+  // A new exercise gets the name-based default as soon as its name is typed,
+  // until the user taps a chip themselves.
+  nameInput.addEventListener("change", () => {
+    if (!musclePicker.touched) musclePicker.set(defaultMusclesFor(nameInput.value));
+  });
+
   const error = document.createElement("p");
   error.className = "inline-form-error";
   form.appendChild(error);
@@ -632,7 +721,7 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
       error.textContent = "Vul een gewichtsstap in, bijv. 2.5 of 2,3.";
       return;
     }
-    onSubmit({ name, sets, repMin, repMax, incrementKg });
+    onSubmit({ name, sets, repMin, repMax, incrementKg, muscles: musclePicker.get() });
   });
 
   focusOnInsert(nameInput);
