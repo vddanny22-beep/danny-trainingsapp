@@ -6,6 +6,8 @@ import { renderHistoryView } from "./history-view.js";
 import { renderProgressView } from "./progress-view.js";
 import { renderChatView } from "./chat-view.js";
 import { watchForUpdates } from "./app-update.js";
+import { runMigrations, markSchemaCurrent } from "./migrations.js";
+import { showToast } from "./ui-toast.js";
 
 const content = document.getElementById("content");
 const navToday = document.getElementById("nav-today");
@@ -79,12 +81,15 @@ function setActiveNav(button) {
   if (navIndicator && index !== -1) navIndicator.style.setProperty("--nav-index", index);
 }
 
+// Returns true when it seeded — a fresh schema is already in the current
+// format, so there's nothing for migrations.js to upgrade.
 async function seedIfEmpty() {
   const days = await storage.getDays();
-  if (days.length) return;
+  if (days.length) return false;
   for (const day of getSeedDays()) {
     await storage.saveDay(day);
   }
+  return true;
 }
 
 navToday.addEventListener("click", () => switchTab("today"));
@@ -95,8 +100,20 @@ navChat.addEventListener("click", () => switchTab("chat"));
 
 async function init() {
   await storage.initDB();
-  await seedIfEmpty();
+  if (await seedIfEmpty()) await markSchemaCurrent();
+
+  // Before the first render, so no tab ever shows the old schema. A failed
+  // migration leaves the data exactly as it was (it's one transaction) and
+  // the app keeps working on the old schema rather than not starting at all.
+  let migrationSummary = null;
+  try {
+    migrationSummary = await runMigrations();
+  } catch (err) {
+    console.error("Schema migration failed:", err);
+  }
+
   await switchTab("today");
+  if (migrationSummary) showToast(migrationSummary, 7000);
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker

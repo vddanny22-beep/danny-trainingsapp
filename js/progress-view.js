@@ -2,6 +2,9 @@ import * as storage from "./storage.js";
 import { renderSparkline } from "./sparkline.js";
 import { volumeByWeek, volumeByCategory, percentChange, weeklyTrend } from "./volume-stats.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
+import { historyByExercise, summariseExercise, trainingOverview, hasProgressed } from "./exercise-stats.js";
+import { formatSetsLine } from "./formatters.js";
+import { formatRir } from "./progression.js";
 
 // Voortgang tab: body metrics (weight/waist/note) logged by date, plus local-only
 // progress photos. Entirely separate from sessions/sync — never touches
@@ -14,9 +17,27 @@ export async function renderProgressView(container) {
   heading.textContent = "Voortgang";
   container.appendChild(heading);
 
-  const logs = await storage.getBodyLogs();
+  const [logs, sessions, days] = await Promise.all([storage.getBodyLogs(), storage.getSessions(), storage.getDays()]);
+
+  // LICHAAM: weight and waist as separate cards — for a recomp the waist says
+  // more than the scale, which can sit still while fat goes and muscle comes.
+  const bodyHeading = document.createElement("h3");
+  bodyHeading.className = "overview-heading";
+  bodyHeading.textContent = "Lichaam";
+  container.appendChild(bodyHeading);
   const statRow = renderStatRow(logs);
   if (statRow) container.appendChild(statRow);
+  else {
+    const empty = document.createElement("p");
+    empty.className = "sync-help";
+    empty.textContent = "Nog geen metingen — log hieronder je gewicht en taille.";
+    container.appendChild(empty);
+  }
+  const recompHint = renderRecompHint(logs);
+  if (recompHint) container.appendChild(recompHint);
+
+  container.appendChild(renderTrainingOverview(sessions));
+  container.appendChild(renderExerciseProgress(sessions, days));
 
   container.appendChild(await renderBodyLogSection(container, logs));
   container.appendChild(await renderPhotoSection(container));
@@ -78,6 +99,145 @@ function renderStatCard(label, points, unit) {
     card.appendChild(deltaEl);
   }
 
+  return card;
+}
+
+// Waist down while weight holds steady = the recomp working. Over the last
+// ~4 weeks of measurements; silent when there isn't enough data.
+function renderRecompHint(logs) {
+  const cutoff = Date.now() - 35 * 24 * 60 * 60 * 1000;
+  const recent = (key) => metricPoints(logs, key).filter((p) => new Date(p.date).getTime() >= cutoff);
+  const weight = recent("weightKg");
+  const waist = recent("waistCm");
+  if (weight.length < 2 || waist.length < 2) return null;
+  const dWeight = weight[weight.length - 1].value - weight[0].value;
+  const dWaist = waist[waist.length - 1].value - waist[0].value;
+  let text = null;
+  if (dWaist <= -0.5 && Math.abs(dWeight) <= 1) text = "Taille daalt terwijl je gewicht stabiel blijft — precies wat je bij body recomposition wilt zien.";
+  else if (dWaist <= -0.5) text = "Je taille daalt: je verliest vet.";
+  else if (dWaist >= 1) text = "Je taille stijgt de laatste weken — check je voeding.";
+  if (!text) return null;
+  const p = document.createElement("p");
+  p.className = "recomp-hint";
+  p.textContent = text;
+  return p;
+}
+
+function renderOverviewCard(label, value, sub) {
+  const card = document.createElement("div");
+  card.className = "stat-card";
+  const labelEl = document.createElement("p");
+  labelEl.className = "stat-card-label";
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+  const valueEl = document.createElement("p");
+  valueEl.className = "stat-card-value";
+  valueEl.textContent = value;
+  card.appendChild(valueEl);
+  if (sub) {
+    const subEl = document.createElement("p");
+    subEl.className = "stat-card-delta";
+    subEl.textContent = sub;
+    card.appendChild(subEl);
+  }
+  return card;
+}
+
+function renderTrainingOverview(sessions) {
+  const wrap = document.createElement("section");
+  const heading = document.createElement("h3");
+  heading.className = "overview-heading";
+  heading.textContent = "Training";
+  wrap.appendChild(heading);
+
+  const o = trainingOverview(sessions);
+  const grid = document.createElement("div");
+  grid.className = "stat-row stat-grid";
+  grid.appendChild(renderOverviewCard("Laatste 7 dagen", `${o.sessions7}×`, "trainingen"));
+  grid.appendChild(renderOverviewCard("Laatste 30 dagen", `${o.sessions30}×`, o.cardio30 ? `trainingen · ${o.cardio30}× cardio` : "trainingen"));
+  grid.appendChild(renderOverviewCard("Volume 30 dagen", formatKg(o.volume30), `totaal ${formatKg(o.volumeTotal)}`));
+  grid.appendChild(renderOverviewCard("Progressie", `${o.progressed}/${o.tracked}`, "oefeningen sterker dan 4 wk geleden"));
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+// Per exercise: last weight, best weight, reps, total volume, e1RM and a trend
+// line. Current schema's exercises first (in schema order), then anything that
+// is only in the history (e.g. dropped from the schema by the migration).
+function renderExerciseProgress(sessions, days) {
+  const section = document.createElement("section");
+  section.className = "trend-section";
+  const heading = document.createElement("h3");
+  heading.textContent = "Per oefening";
+  section.appendChild(heading);
+
+  const byName = historyByExercise(sessions);
+  if (!byName.size) {
+    const empty = document.createElement("p");
+    empty.textContent = "Log een training via Vandaag om hier je voortgang per oefening te zien.";
+    section.appendChild(empty);
+    return section;
+  }
+
+  const schemaExercises = new Map();
+  days.forEach((day) => day.exercises.forEach((ex) => {
+    if (!schemaExercises.has(ex.name)) schemaExercises.set(ex.name, ex);
+  }));
+  const inSchema = [...schemaExercises.keys()].filter((name) => byName.has(name));
+  const historyOnly = [...byName.keys()].filter((name) => !schemaExercises.has(name));
+
+  inSchema.forEach((name) => section.appendChild(renderExerciseCard(name, byName.get(name), schemaExercises.get(name))));
+  if (historyOnly.length) {
+    const sub = document.createElement("p");
+    sub.className = "progress-sublabel";
+    sub.textContent = "Niet meer in je schema:";
+    section.appendChild(sub);
+    historyOnly.forEach((name) => section.appendChild(renderExerciseCard(name, byName.get(name), null)));
+  }
+  return section;
+}
+
+function formatDeltaKg(first, last) {
+  const delta = Math.round((last - first) * 10) / 10;
+  if (delta === 0) return "gelijk";
+  return delta > 0 ? `+${delta} kg` : `${delta} kg`;
+}
+
+function renderExerciseCard(name, history, exercise) {
+  const s = summariseExercise(history);
+  const card = document.createElement("details");
+  card.className = "exercise-progress";
+
+  const summary = document.createElement("summary");
+  const title = document.createElement("span");
+  title.className = "exercise-progress-name";
+  title.textContent = name;
+  summary.appendChild(title);
+  const chip = document.createElement("span");
+  chip.className = hasProgressed(history) ? "chip chip-up" : "chip chip-muted";
+  chip.textContent = `${s.lastWeight} kg`;
+  summary.appendChild(chip);
+  card.appendChild(summary);
+
+  const lines = [
+    `Laatst (${formatShortDate(s.lastDate)}): ${formatSetsLine(s.lastSets)}${s.lastRir != null ? ` · RIR ${formatRir(s.lastRir)}` : ""}`,
+    `Beste gewicht: ${s.bestWeight} kg × ${s.bestWeightReps}`,
+    `Totaal volume: ${formatKg(s.totalVolume)} over ${s.count} ${s.count === 1 ? "sessie" : "sessies"}`,
+  ];
+  // e1RM is only a meaningful number for work in a lowish rep range; for a
+  // 12–20 rep lateral raise it would mostly be noise, so the trend shows the
+  // working weight there instead.
+  const e1rmRelevant = (exercise ? exercise.repMax : Math.min(...s.lastSets.map((x) => x.reps))) <= 12;
+  if (e1rmRelevant) lines.push(`Geschat 1RM: ${s.firstE1rm} → ${s.lastE1rm} kg (${formatDeltaKg(s.firstE1rm, s.lastE1rm)})`);
+  else lines.push(`Werkgewicht: ${s.weightSeries[0]} → ${s.weightSeries[s.weightSeries.length - 1]} kg (${formatDeltaKg(s.weightSeries[0], s.weightSeries[s.weightSeries.length - 1])})`);
+
+  lines.forEach((text) => {
+    const line = document.createElement("p");
+    line.className = "exercise-progress-line";
+    line.textContent = text;
+    card.appendChild(line);
+  });
+  if (history.length >= 2) card.appendChild(renderSparkline(e1rmRelevant ? s.e1rmSeries : s.weightSeries));
   return card;
 }
 

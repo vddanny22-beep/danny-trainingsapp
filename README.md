@@ -59,7 +59,10 @@ it with its own icon, launching full-screen like a real app.
 - `service-worker.js` — caches the app for offline use
 - `css/style.css` — mobile-first styling
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
-- `js/progression.js` — the weight auto-progression rule, ported from the Sheet
+- `js/progression.js` — progressive-overload advice from ALL sets + the RIR of the last set (increase / hold / improve reps / possibly too heavy), with a per-exercise `incrementKg`
+- `js/migrations.js` — versioned one-time schema migrations (`schemaVersion` in the IndexedDB `meta` store); v2 = the hypertrophy plan from `seed.js`, with a snapshot of the old schema that can be restored from the Schema tab
+- `js/exercise-stats.js` — pure per-exercise / whole-training stats for Voortgang and the AI Coach
+- `js/formatters.js` — shared display helpers (set lines, cardio)
 - `js/volume-stats.js` — pure aggregation helpers: weekly training volume, split per movement type, and Epley 1RM estimates
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
@@ -86,8 +89,9 @@ it with its own icon, launching full-screen like a real app.
 ## Setting up the AI Coach (optional)
 
 The AI Coach tab answers questions about krachttraining, sporten, voeding en
-herstel, grounded in your own schema, your last 5 logged sessions and your
-last 5 body-metric entries (so it can spot stagnation, judge progression, or
+herstel, grounded in your goal (body recomposition), your schema, training
+frequency, your last 10 sessions (incl. RIR and cardio), per-exercise trends
+and your last 10 body-metric entries (so it can spot stagnation, judge progression, or
 tune nutrition advice to your training volume). It calls the Gemini API
 directly from the browser — there's no backend, so this only works because
 it's a personal, single-user app:

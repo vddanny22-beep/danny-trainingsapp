@@ -1,9 +1,10 @@
 // IndexedDB wrapper. Object stores: "days" (schema), "sessions" (workout log),
-// "bodyLogs" (weight/waist/note), "photos" (progress photo blobs) and
-// "chatMessages" (AI coach conversation history).
+// "bodyLogs" (weight/waist/note), "photos" (progress photo blobs),
+// "chatMessages" (AI coach conversation history) and "meta" (key/value app
+// state such as schemaVersion — see migrations.js).
 
 const DB_NAME = "trainingsapp";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise = null;
 
@@ -31,8 +32,21 @@ export function initDB() {
       if (!db.objectStoreNames.contains("chatMessages")) {
         db.createObjectStore("chatMessages", { keyPath: "id" });
       }
+      if (!db.objectStoreNames.contains("meta")) {
+        db.createObjectStore("meta", { keyPath: "key" });
+      }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // A newer version of the app (another tab, or the page after an
+      // update) wants to upgrade the database: let go of it instead of
+      // blocking that upgrade until this page is closed.
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
   return dbPromise;
@@ -63,6 +77,20 @@ export async function saveDay(day) {
 export async function deleteDay(id) {
   const store = await tx("days", "readwrite");
   return requestToPromise(store.delete(id));
+}
+
+// Replaces the whole schema at once (used to undo the schema migration).
+export async function replaceDays(days) {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("days", "readwrite");
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+    const store = transaction.objectStore("days");
+    store.clear();
+    days.forEach((day) => store.put(day));
+  });
 }
 
 export async function getSessions() {
@@ -156,13 +184,49 @@ export async function clearChatMessages() {
   return requestToPromise(store.clear());
 }
 
+// App state as { key, value } records: schemaVersion, the pre-migration
+// schema snapshot, and similar bookkeeping that must live next to the data it
+// describes (localStorage can be cleared independently of IndexedDB).
+export async function getMeta(key) {
+  const store = await tx("meta", "readonly");
+  const record = await requestToPromise(store.get(key));
+  return record ? record.value : undefined;
+}
+
+export async function setMeta(key, value) {
+  const store = await tx("meta", "readwrite");
+  return requestToPromise(store.put({ key, value }));
+}
+
+// Writes the migrated days and the meta records in ONE transaction: either the
+// schema is upgraded and the version recorded, or neither — so a migration
+// interrupted halfway (phone killed the page) simply runs again next launch.
+// Only "days" and "meta" are touched; sessions, body logs, photos and chat
+// are not even opened by this transaction.
+export async function commitDaysMigration(days, metaEntries) {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(["days", "meta"], "readwrite");
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+    const dayStore = transaction.objectStore("days");
+    days.forEach((day) => dayStore.put(day));
+    const metaStore = transaction.objectStore("meta");
+    Object.entries(metaEntries).forEach(([key, value]) => metaStore.put({ key, value }));
+  });
+}
+
 // Wipes and rewrites every data store in ONE transaction, so a restore either
 // lands completely or not at all — a half-written database would leave the
 // user with neither their old data nor their backup. Chat history is
 // deliberately left alone: it isn't part of a backup.
-export async function replaceAllData({ days, sessions, bodyLogs, photos }) {
+// `schemaVersion` is the version the backup's schema was written in; it's
+// stored with the data so migrations.js upgrades an older backup's schema on
+// the next launch instead of treating it as already current.
+export async function replaceAllData({ days, sessions, bodyLogs, photos, schemaVersion }) {
   const db = await initDB();
-  const storeNames = ["days", "sessions", "bodyLogs", "photos"];
+  const storeNames = ["days", "sessions", "bodyLogs", "photos", "meta"];
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeNames, "readwrite");
     transaction.oncomplete = () => resolve();
@@ -178,5 +242,8 @@ export async function replaceAllData({ days, sessions, bodyLogs, photos }) {
     rewrite("sessions", sessions);
     rewrite("bodyLogs", bodyLogs);
     rewrite("photos", photos);
+    // Only the version marker — other meta (e.g. the pre-migration snapshot)
+    // stays, since it describes this device, not the backup.
+    transaction.objectStore("meta").put({ key: "schemaVersion", value: schemaVersion });
   });
 }
