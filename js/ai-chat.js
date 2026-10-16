@@ -2,6 +2,9 @@ import * as storage from "./storage.js";
 import { formatRir, incrementFor } from "./progression.js";
 import { historyByExercise, trainingOverview, exerciseFlags } from "./exercise-stats.js";
 import { formatCardio } from "./formatters.js";
+import { MUSCLES, makeMuscleResolver, recentMuscleSets, plannedMuscleSets, formatSets } from "./muscles.js";
+import { recordsBySession, formatRecord } from "./exercise-stats.js";
+import { getTargets, dailyAverages } from "./daily-log.js";
 
 // AI Coach: calls the Gemini API directly from the browser with a key the
 // user pastes in themselves and which never leaves this device (localStorage
@@ -52,7 +55,7 @@ Trainingsstrategie waar je advies op aansluit:
 - herstel is belangrijker dan blind meer volume toevoegen — in een calorietekort eerder volume behouden of verlagen dan verhogen;
 - cardio (incline walking) na de training telt niet mee als krachttraining.
 
-Let in de gegevens hieronder actief op signalen zoals: meerdere weken geen progressie, structureel RIR 0, teruglopende reps, mogelijke herstelproblemen (dalende prestaties over meerdere oefeningen, notities over slaap/vermoeidheid), snelle krachtprogressie (gewicht mag sneller omhoog), en een dalende taille bij stabiel gewicht (recomp werkt). Benoem zo'n signaal concreet met oefening en cijfers als het relevant is voor de vraag.`;
+Let in de gegevens hieronder actief op signalen zoals: meerdere weken geen progressie, structureel RIR 0, teruglopende reps, mogelijke herstelproblemen (dalende prestaties over meerdere oefeningen, notities over slaap/vermoeidheid), snelle krachtprogressie (gewicht mag sneller omhoog), een dalende taille bij stabiel gewicht (recomp werkt), spiergroepen die structureel onder of ruim boven hun set-richtlijn zitten, en eiwitinname of stappen die achterblijven bij het doel. Benoem zo'n signaal concreet met oefening en cijfers als het relevant is voor de vraag.`;
 
 // How many recent sessions/logs to include — enough for the coach to spot a
 // trend without ballooning every request's token count.
@@ -151,18 +154,50 @@ function buildExerciseTrendsContext(days, sessions) {
   return `\n\nVerloop per oefening (oudste eerst; gewicht, reps per set, RIR laatste set):\n${lines.join("\n")}`;
 }
 
+// Hard sets per muscle group (last 7 days vs. what the schema plans per
+// week), so the coach can spot a lagging or overloaded muscle group.
+function buildMuscleContext(days, sessions) {
+  const recent = recentMuscleSets(sessions, makeMuscleResolver(days));
+  const planned = plannedMuscleSets(days);
+  const lines = MUSCLES.map(({ key, label, target }) =>
+    `- ${label}: ${formatSets(recent[key])} sets laatste 7 dagen, ${formatSets(planned[key])} gepland per week${target ? ` (richtlijn ${target[0]}–${target[1]})` : ""}`
+  );
+  return `\n\nHarde sets per spiergroep (hoofdspier telt 1, hulpspier 0,5):\n${lines.join("\n")}`;
+}
+
+function buildRecordsContext(sessions) {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const records = [...recordsBySession(sessions).values()].flat().filter((r) => new Date(r.date).getTime() >= cutoff);
+  if (!records.length) return "\n\nPersoonlijke records laatste 30 dagen: geen.";
+  return `\n\nPersoonlijke records laatste 30 dagen:\n${records.map((r) => `- ${new Date(r.date).toLocaleDateString("nl-NL")}: ${formatRecord(r)}`).join("\n")}`;
+}
+
+// Protein and steps — the coach otherwise has to guess the nutrition side.
+function buildDailyContext(dailyLogs, bodyLogs) {
+  const weight = bodyLogs.find((l) => l.weightKg != null)?.weightKg ?? null;
+  const targets = getTargets(weight);
+  const avg = dailyAverages(dailyLogs);
+  const protein = avg.protein ? `${avg.protein.avg} g gemiddeld (${avg.protein.days} van 7 dagen gelogd)` : "niet gelogd";
+  const steps = avg.steps ? `${avg.steps.avg} gemiddeld (${avg.steps.days} van 7 dagen gelogd)` : "niet gelogd";
+  return `\n\nEiwit laatste 7 dagen: ${protein}; doel ${targets.proteinG} g/dag. Stappen laatste 7 dagen: ${steps}; doel ${targets.steps}/dag.`;
+}
+
 async function buildUserContext() {
-  const [days, sessions, bodyLogs] = await Promise.all([
+  const [days, sessions, bodyLogs, dailyLogs] = await Promise.all([
     storage.getDays(),
     storage.getSessions(),
     storage.getBodyLogs(),
+    storage.getDailyLogs(),
   ]);
   return (
     buildScheduleContext(days) +
     buildFrequencyContext(sessions) +
     buildSessionsContext(sessions) +
     buildExerciseTrendsContext(days, sessions) +
-    buildBodyLogsContext(bodyLogs)
+    buildMuscleContext(days, sessions) +
+    buildRecordsContext(sessions) +
+    buildBodyLogsContext(bodyLogs) +
+    buildDailyContext(dailyLogs, bodyLogs)
   );
 }
 

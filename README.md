@@ -63,6 +63,10 @@ it with its own icon, launching full-screen like a real app.
 - `js/migrations.js` — versioned one-time schema migrations (`schemaVersion` in the IndexedDB `meta` store); v2 = the hypertrophy plan from `seed.js`, with a snapshot of the old schema that can be restored from the Schema tab
 - `js/exercise-stats.js` — pure per-exercise / whole-training stats for Voortgang and the AI Coach
 - `js/formatters.js` — shared display helpers (set lines, cardio)
+- `js/muscles.js` — which muscles each exercise trains (name-based defaults, overridable per exercise in the Schema tab) and hard sets per muscle group (primary 1, secondary ½) against a weekly hypertrophy target
+- `js/body-map.js` — the front/back body map (inline SVG, works offline) used after a workout and on Voortgang
+- `js/daily-log.js` — protein and steps per day (Vandaag card, Voortgang averages, targets); stored in the IndexedDB `dailyLogs` store and included in backups
+- `js/samsung-import.js` — imports steps and body weight from a Samsung Health CSV export (Samsung Health → Instellingen → Persoonlijke gegevens downloaden). There is no direct link: Samsung Health / Health Connect are only reachable from a native Android app. The parser is tolerant of column prefixes, shows a preview first, only adds/updates, and re-importing the same export doesn't duplicate anything
 - `js/volume-stats.js` — pure aggregation helpers: weekly training volume, split per movement type, and Epley 1RM estimates
 - `js/seed.js` — the default schema loaded on first run only (fully editable after)
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections

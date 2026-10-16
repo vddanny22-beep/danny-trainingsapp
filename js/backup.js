@@ -34,11 +34,12 @@ async function dataUrlToBlob(dataUrl) {
 }
 
 export async function buildBackup() {
-  const [days, sessions, bodyLogs, photos] = await Promise.all([
+  const [days, sessions, bodyLogs, photos, dailyLogs] = await Promise.all([
     storage.getDays(),
     storage.getSessions(),
     storage.getBodyLogs(),
     storage.getPhotos(),
+    storage.getDailyLogs(),
   ]);
 
   const encodedPhotos = [];
@@ -61,6 +62,7 @@ export async function buildBackup() {
     days,
     sessions,
     bodyLogs,
+    dailyLogs,
     photos: encodedPhotos,
   };
 }
@@ -148,6 +150,8 @@ export async function restoreBackupFromFile(file) {
       days: parsed.days,
       sessions: parsed.sessions,
       bodyLogs: parsed.bodyLogs || [],
+      // Absent in backups made before the daily log existed.
+      dailyLogs: Array.isArray(parsed.dailyLogs) ? parsed.dailyLogs : [],
       photos,
       schemaVersion: Number.isInteger(parsed.schemaVersion) ? parsed.schemaVersion : 1,
     });
@@ -160,6 +164,7 @@ export async function restoreBackupFromFile(file) {
     `${parsed.sessions.length} sessies`,
     `${(parsed.bodyLogs || []).length} metingen`,
     `${(parsed.photos || []).length} foto's`,
+    `${(parsed.dailyLogs || []).length} dagen eiwit/stappen`,
   ].join(", ");
   return { ok: true, message: `Back-up teruggezet: ${counts}.` };
 }
