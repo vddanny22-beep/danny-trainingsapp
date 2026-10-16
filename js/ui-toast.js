@@ -17,7 +17,7 @@ function ensureToast() {
   return toastEl;
 }
 
-export function showToast(message) {
+export function showToast(message, durationMs = DISMISS_AFTER_MS) {
   const el = ensureToast();
   el.textContent = message;
   el.classList.add("visible");
@@ -25,5 +25,5 @@ export function showToast(message) {
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => {
     el.classList.remove("visible");
-  }, DISMISS_AFTER_MS);
+  }, durationMs);
 }

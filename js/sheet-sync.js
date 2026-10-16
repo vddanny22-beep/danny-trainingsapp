@@ -41,6 +41,27 @@ function entryToRow(session, entry) {
   return [dateLabel, session.dayName, entry.exerciseName, ...setCells, volume];
 }
 
+// New columns travel OUTSIDE `rows`, in a parallel `extra` array (one entry
+// per row) plus a separate `cardioRows` list. An Apps Script deployed before
+// this existed only reads `rows` and writes exactly its 12 columns, so it
+// keeps working unchanged and simply ignores the new data; the updated
+// AppsScript.gs appends `extra` as column 13 ("RIR laatste set") and writes
+// cardio to its own "App Cardio" tab. Existing cells are never rewritten.
+function entryExtra(entry) {
+  return [entry.lastSetRir ?? ""];
+}
+
+function cardioToRow(session) {
+  const c = session.cardio;
+  return [
+    new Date(session.date).toLocaleDateString("nl-NL"),
+    session.dayName,
+    c.minutes,
+    c.inclinePct ?? "",
+    c.speedKmh ?? "",
+  ];
+}
+
 // Returns { ok: true, count } on success, { ok: false, message } on failure.
 // Never advances lastSyncedAt on failure, so a failed sync retries the same
 // sessions next time rather than silently losing them.
@@ -56,20 +77,24 @@ export async function syncNow() {
     .reverse(); // oldest-first, so rows land in the Sheet in chronological order
 
   const rows = [];
+  const extra = [];
+  const cardioRows = [];
   for (const session of sessions) {
     for (const entry of session.entries) {
       rows.push(entryToRow(session, entry));
+      extra.push(entryExtra(entry));
     }
+    if (session.cardio?.minutes > 0) cardioRows.push(cardioToRow(session));
   }
 
-  if (!rows.length) {
+  if (!rows.length && !cardioRows.length) {
     return { ok: true, count: 0, message: "Niets nieuws om te syncen." };
   }
 
   try {
     const response = await fetch(url, {
       method: "POST",
-      body: JSON.stringify({ rows }),
+      body: JSON.stringify({ rows, extra, cardioRows }),
     });
     if (!response.ok) {
       return { ok: false, message: `Sync mislukt (server antwoordde ${response.status}).` };
@@ -90,7 +115,13 @@ export async function syncNow() {
     }
 
     setLastSyncedAt(new Date().toISOString());
-    return { ok: true, count: rows.length, message: `${rows.length} regels gesynchroniseerd.` };
+    // payload.version is only sent by the updated AppsScript.gs. Without it,
+    // the 12 classic columns did sync, but RIR/cardio were ignored.
+    const hasNewData = extra.some((cells) => cells[0] !== "") || cardioRows.length;
+    const outdatedNote = !payload.version && hasNewData
+      ? " RIR en cardio zijn niet meegestuurd: plak de nieuwe AppsScript.gs in je Sheet en maak een nieuwe implementatieversie."
+      : "";
+    return { ok: true, count: rows.length, message: `${rows.length} regels gesynchroniseerd.${outdatedNote}` };
   } catch (err) {
     return { ok: false, message: `Sync mislukt: ${err.message}. Klopt de URL en is de webapp gedeployed?` };
   }

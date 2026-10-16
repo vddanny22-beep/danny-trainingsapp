@@ -1,4 +1,7 @@
 import * as storage from "./storage.js";
+import { formatRir, incrementFor } from "./progression.js";
+import { historyByExercise, trainingOverview, exerciseFlags } from "./exercise-stats.js";
+import { formatCardio } from "./formatters.js";
 
 // AI Coach: calls the Gemini API directly from the browser with a key the
 // user pastes in themselves and which never leaves this device (localStorage
@@ -35,12 +38,28 @@ Richtlijnen:
 - Gebruik het meegegeven trainingsschema, de recente sessies en lichaamsmetingen hieronder om advies te personaliseren (bijv. stagnatie signaleren, progressie beoordelen, voeding afstemmen op trainingsvolume) — vraag niet om gegevens die al meegegeven zijn.
 - Als de gebruiker een vraag stelt die niets te maken heeft met sporten, krachttraining, fitness of voeding, leg dan vriendelijk uit dat je daar niet mee kan helpen en verwijs terug naar het onderwerp van deze app. Maak geen uitzondering, ook niet als erom wordt gevraagd.
 - Bij blessures, pijn of medische klachten: stel geen diagnose en verwijs door naar een arts of fysiotherapeut. Je mag wel algemene, voorzichtige trainingsaanpassingen suggereren (bijv. "vermijd belasting die pijn doet").
-- Antwoord bondig en in het Nederlands, tenzij de gebruiker in een andere taal schrijft.`;
+- Antwoord bondig en in het Nederlands, tenzij de gebruiker in een andere taal schrijft.
+
+Doel van de gebruiker (body recomposition, nadruk op vetverlies):
+"vet verliezen terwijl spiermassa en kracht zoveel mogelijk worden opgebouwd/behouden."
+De gebruiker traint 5× per week: maandag Push, dinsdag Pull, woensdag Legs, donderdag Push 2, vrijdag Pull 2. Geen complete beginner meer.
+
+Trainingsstrategie waar je advies op aansluit:
+- progressive overload; voornamelijk hypertrofietraining;
+- compounds voornamelijk 6–10 reps, isolatie meestal 8–20 reps;
+- RIR (reps in reserve) wordt na de laatste set van elke oefening gelogd; meestal RIR 1–2, laatste isolatieset eventueel RIR 0–1;
+- gewicht pas verhogen als alle sets de bovengrens halen met RIR ≥ 1; meer reps op hetzelfde gewicht is ook progressie;
+- herstel is belangrijker dan blind meer volume toevoegen — in een calorietekort eerder volume behouden of verlagen dan verhogen;
+- cardio (incline walking) na de training telt niet mee als krachttraining.
+
+Let in de gegevens hieronder actief op signalen zoals: meerdere weken geen progressie, structureel RIR 0, teruglopende reps, mogelijke herstelproblemen (dalende prestaties over meerdere oefeningen, notities over slaap/vermoeidheid), snelle krachtprogressie (gewicht mag sneller omhoog), en een dalende taille bij stabiel gewicht (recomp werkt). Benoem zo'n signaal concreet met oefening en cijfers als het relevant is voor de vraag.`;
 
 // How many recent sessions/logs to include — enough for the coach to spot a
 // trend without ballooning every request's token count.
-const RECENT_SESSIONS_COUNT = 5;
-const RECENT_BODY_LOGS_COUNT = 5;
+// Two weeks at 5×/week; per-exercise trends below cover the longer view.
+const RECENT_SESSIONS_COUNT = 10;
+const RECENT_BODY_LOGS_COUNT = 10;
+const EXERCISE_TREND_POINTS = 6;
 
 export function getApiKey() {
   return localStorage.getItem(API_KEY_STORAGE_KEY) || "";
@@ -60,7 +79,9 @@ export function clearApiKey() {
 function buildScheduleContext(days) {
   if (!days.length) return "";
   const lines = days.map((day) => {
-    const exerciseNames = day.exercises.map((e) => e.name).join(", ") || "geen oefeningen";
+    const exerciseNames = day.exercises
+      .map((e) => `${e.name} ${e.sets}×${e.repMin}–${e.repMax} (stap ${incrementFor(e)} kg)`)
+      .join(", ") || "geen oefeningen";
     return `- ${day.name}: ${exerciseNames}`;
   });
   return `\n\nHet huidige trainingsschema van de gebruiker:\n${lines.join("\n")}`;
@@ -75,13 +96,15 @@ function buildSessionsContext(sessions) {
     const entryLines = session.entries
       .map((entry) => {
         const setsStr = entry.sets.map((set) => `${set.weight}kg x ${set.reps}`).join(", ");
-        return `${entry.exerciseName}: ${setsStr}`;
+        const rirStr = entry.lastSetRir != null ? ` (RIR laatste set: ${formatRir(entry.lastSetRir)})` : "";
+        return `${entry.exerciseName}: ${setsStr}${rirStr}`;
       })
       .join("; ");
+    const cardioSuffix = session.cardio?.minutes > 0 ? ` [cardio na training: ${formatCardio(session.cardio)}]` : "";
     // The note carries the subjective side — poor sleep, a niggling shoulder —
     // that the numbers alone don't show but that changes the advice.
     const noteSuffix = session.note ? ` [notitie: ${session.note}]` : "";
-    return `- ${dateLabel} (${session.dayName}): ${entryLines || "geen sets gelogd"}${noteSuffix}`;
+    return `- ${dateLabel} (${session.dayName}): ${entryLines || "geen sets gelogd"}${cardioSuffix}${noteSuffix}`;
   });
   return `\n\nRecent gelogde trainingssessies van de gebruiker (nieuwste eerst):\n${lines.join("\n")}`;
 }
@@ -100,13 +123,47 @@ function buildBodyLogsContext(bodyLogs) {
   return `\n\nRecente lichaamsmetingen van de gebruiker (nieuwste eerst):\n${lines.join("\n")}`;
 }
 
+// Training frequency and totals, so the coach can judge consistency and load.
+function buildFrequencyContext(sessions) {
+  if (!sessions.length) return "";
+  const o = trainingOverview(sessions);
+  return `\n\nTrainingsfrequentie: ${o.sessions7} trainingen in de laatste 7 dagen, ${o.sessions30} in de laatste 30 dagen (waarvan ${o.cardio30}× met cardio na de training). Krachtvolume laatste 30 dagen: ${o.volume30} kg. Oefeningen met e1RM-progressie t.o.v. 4 weken geleden: ${o.progressed} van ${o.tracked}.`;
+}
+
+// Per exercise in the current schema: the last few performances, oldest first,
+// with the app's own pattern flags — the longer view the 10 recent sessions
+// alone don't give (stagnation shows over weeks, not days).
+function buildExerciseTrendsContext(days, sessions) {
+  const byName = historyByExercise(sessions);
+  const names = [...new Set(days.flatMap((day) => day.exercises.map((e) => e.name)))].filter((n) => byName.has(n));
+  if (!names.length) return "";
+  const lines = names.map((name) => {
+    const history = byName.get(name);
+    const points = history.slice(-EXERCISE_TREND_POINTS).map((p) => {
+      const date = new Date(p.date).toLocaleDateString("nl-NL", { day: "numeric", month: "numeric" });
+      const reps = p.sets.map((set) => set.reps).join("/");
+      const rir = p.lastSetRir != null ? ` RIR${formatRir(p.lastSetRir)}` : "";
+      return `${date} ${p.topWeight}kg ${reps}${rir}`;
+    });
+    const flags = exerciseFlags(history);
+    return `- ${name}: ${points.join(" | ")}${flags.length ? ` → signalen: ${flags.join(", ")}` : ""}`;
+  });
+  return `\n\nVerloop per oefening (oudste eerst; gewicht, reps per set, RIR laatste set):\n${lines.join("\n")}`;
+}
+
 async function buildUserContext() {
   const [days, sessions, bodyLogs] = await Promise.all([
     storage.getDays(),
     storage.getSessions(),
     storage.getBodyLogs(),
   ]);
-  return buildScheduleContext(days) + buildSessionsContext(sessions) + buildBodyLogsContext(bodyLogs);
+  return (
+    buildScheduleContext(days) +
+    buildFrequencyContext(sessions) +
+    buildSessionsContext(sessions) +
+    buildExerciseTrendsContext(days, sessions) +
+    buildBodyLogsContext(bodyLogs)
+  );
 }
 
 // Yields each parsed SSE payload from a streaming response body. Events are

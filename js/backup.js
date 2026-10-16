@@ -1,10 +1,18 @@
 import * as storage from "./storage.js";
+import { CURRENT_SCHEMA_VERSION } from "./migrations.js";
 
 // Full local backup: schema, sessions, body metrics and photos in one JSON
 // file. This is the only way data leaves the phone in a restorable form — the
 // Sheet sync is one-way and covers sessions only — so it's also what makes
 // moving to a new phone possible. Chat history is deliberately excluded: it's
 // a conversation log, not training data.
+//
+// Sessions, days and body logs are written as-is, so every field on them —
+// lastSetRir, cardio, incrementKg, whatever comes next — travels along
+// without this file having to know about it. `schemaVersion` records which
+// schema format `days` is in: restoring an older backup stores that older
+// version, and migrations.js upgrades its schema on the reload that follows.
+// Backups made before schemaVersion existed are version 1.
 
 const BACKUP_APP = "trainingsapp";
 const BACKUP_VERSION = 1;
@@ -43,9 +51,12 @@ export async function buildBackup() {
     });
   }
 
+  const schemaVersion = (await storage.getMeta("schemaVersion")) || 1;
+
   return {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
+    schemaVersion,
     exportedAt: new Date().toISOString(),
     days,
     sessions,
@@ -99,6 +110,9 @@ function validateBackup(parsed) {
   if (parsed.version > BACKUP_VERSION) {
     return "Deze back-up komt uit een nieuwere versie van de app. Werk de app eerst bij.";
   }
+  if (Number(parsed.schemaVersion) > CURRENT_SCHEMA_VERSION) {
+    return "Deze back-up komt uit een nieuwere versie van de app. Werk de app eerst bij.";
+  }
   if (!isPlainArray(parsed.days) || !isPlainArray(parsed.sessions)) {
     return "Deze back-up is beschadigd (schema of sessies ontbreken).";
   }
@@ -135,6 +149,7 @@ export async function restoreBackupFromFile(file) {
       sessions: parsed.sessions,
       bodyLogs: parsed.bodyLogs || [],
       photos,
+      schemaVersion: Number.isInteger(parsed.schemaVersion) ? parsed.schemaVersion : 1,
     });
   } catch (err) {
     return { ok: false, message: `Terugzetten mislukt: ${err.message}. Je bestaande gegevens zijn ongewijzigd.` };

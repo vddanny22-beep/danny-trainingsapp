@@ -1,12 +1,22 @@
 import * as storage from "./storage.js";
-import { hitTopOfRange, isLegDay, suggestNextWeight } from "./progression.js";
+import {
+  recommendNext, incrementFor, formatRir, formatAdviceWeight, formatTargetReps, RIR_OPTIONS,
+} from "./progression.js";
 import { startRestTimer, stopRestTimer } from "./rest-timer.js";
-import { loadDraft, saveDraft, clearDraft } from "./workout-draft.js";
+import { loadDraft, saveDraft, clearDraft, getDraftDayId } from "./workout-draft.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { showToast } from "./ui-toast.js";
 import { renderProgressRing, updateProgressRing } from "./progress-ring.js";
+import { formatSetsLine, formatCardio } from "./formatters.js";
+
+// Every render bumps this; a render that finds it changed after an await has
+// been overtaken (e.g. the day picker changed while it was still loading the
+// last-time data) and stops, so a slower stale render can never append its
+// day's exercises on top of the one now on screen.
+let renderToken = 0;
 
 export async function renderTodayView(container) {
+  const token = ++renderToken;
   const days = await storage.getDays();
   if (!days.length) {
     container.innerHTML = "<p>Nog geen schema. Ga naar het Schema-tabblad om er een te maken.</p>";
@@ -14,10 +24,13 @@ export async function renderTodayView(container) {
   }
 
   const defaultDay = await pickDefaultDay(days);
+  if (token !== renderToken) return;
   await renderForDay(container, days, defaultDay.id);
 }
 
 async function pickDefaultDay(days) {
+  const draftDay = days.find((d) => d.id === getDraftDayId());
+  if (draftDay) return draftDay;
   const lastSession = await storage.getLastSession();
   if (!lastSession) return days[0];
   const lastIndex = days.findIndex((d) => d.id === lastSession.dayId);
@@ -114,6 +127,7 @@ function autoExpandBlocks(form) {
 }
 
 async function renderForDay(container, days, selectedDayId) {
+  const token = ++renderToken;
   const day = days.find((d) => d.id === selectedDayId) || days[0];
   container.innerHTML = "";
 
@@ -152,6 +166,9 @@ async function renderForDay(container, days, selectedDayId) {
     form.appendChild(await renderExerciseBlock(exercise, day, index));
   }
 
+  form.appendChild(renderCardioSection(await findLastCardio()));
+  if (token !== renderToken) return;
+
   const note = document.createElement("textarea");
   note.className = "session-note-input";
   note.placeholder = "Notitie (optioneel) — bv. slecht geslapen, schouder gevoelig";
@@ -161,6 +178,7 @@ async function renderForDay(container, days, selectedDayId) {
   const draft = loadDraft(day.id);
   if (draft) {
     applyDraft(form, draft);
+    form.querySelectorAll(".exercise-block").forEach((block) => block._refreshAdvice?.());
     // The form is appended below, so appending here puts the notice directly
     // above it, under the day picker.
     container.appendChild(renderDraftNotice(container, days, day));
@@ -228,13 +246,15 @@ async function renderForDay(container, days, selectedDayId) {
 // screen, including the set you're halfway through typing.
 function collectDraft(form) {
   const sets = {};
+  const rir = {};
   form.querySelectorAll(".exercise-block").forEach((block) => {
     sets[block.dataset.exerciseId] = [...block.querySelectorAll(".set-row")].map((row) => ({
       weight: row.querySelector(".weight-input").value,
       reps: row.querySelector(".reps-input").value,
     }));
+    if (block.dataset.rir) rir[block.dataset.exerciseId] = block.dataset.rir;
   });
-  return { note: form.querySelector(".session-note-input").value, sets };
+  return { note: form.querySelector(".session-note-input").value, sets, rir, cardio: collectCardioRaw(form) };
 }
 
 function applyDraft(form, draft) {
@@ -249,6 +269,17 @@ function applyDraft(form, draft) {
       row.querySelector(".reps-input").value = saved[i].reps ?? "";
     });
   });
+  form.querySelectorAll(".exercise-block").forEach((block) => {
+    const rir = draft.rir?.[block.dataset.exerciseId];
+    if (rir != null && rir !== "") setBlockRir(block, String(rir));
+  });
+  if (draft.cardio) {
+    const fields = cardioFields(form);
+    Object.entries(fields).forEach(([key, input]) => {
+      input.value = draft.cardio[key] ?? "";
+    });
+    if (Object.values(draft.cardio).some((v) => String(v ?? "").trim())) form.querySelector(".cardio-section").open = true;
+  }
   form.querySelector(".session-note-input").value = draft.note || "";
 }
 
@@ -279,32 +310,35 @@ async function renderExerciseBlock(exercise, day, index) {
   block.dataset.exerciseId = exercise.id;
   block.dataset.exerciseName = exercise.name;
   block.dataset.exerciseIndex = index + 1;
+  block.dataset.rir = "";
 
-  // Fetched once and used below — the suggestion is derived from exactly the
-  // sets shown as "vorige keer".
+  // Fetched once and used below — today's advice is derived from exactly the
+  // sets (and RIR) shown as "vorige keer".
   const last = await storage.getLastEntryForExerciseName(exercise.name);
-  const suggestedWeight = computeSuggestedWeight(last, exercise, day);
+  const advice = last ? recommendNext(last.entry.sets, last.entry.lastSetRir, exercise) : null;
+  const suggestedWeight = advice ? advice.nextWeight : null;
 
-  block.appendChild(renderExerciseHeader(exercise, suggestedWeight, block));
+  block.appendChild(renderExerciseHeader(exercise, suggestedWeight, block, advice));
 
   const body = document.createElement("div");
   body.className = "exercise-body";
 
   const meta = document.createElement("p");
   meta.className = "exercise-meta";
-  meta.textContent = `${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps`;
+  meta.textContent = `Doel: ${exercise.sets} × ${exercise.repMin}–${exercise.repMax} · stap +${incrementFor(exercise)} kg`;
   body.appendChild(meta);
 
   // The suggestion alone doesn't say whether you cruised through last time or
-  // barely finished — the actual reps do, and that's what decides whether to
-  // push today.
+  // barely finished — the actual reps (and RIR) do.
   if (last?.entry.sets.length) {
     const previous = document.createElement("p");
     previous.className = "previous-sets";
-    const setsText = last.entry.sets.map((set) => `${set.weight}×${set.reps}`).join("  ");
-    previous.textContent = `Vorige keer (${formatShortDate(last.date)}): ${setsText}`;
+    const rirText = last.entry.lastSetRir != null ? ` · RIR ${formatRir(last.entry.lastSetRir)}` : "";
+    previous.textContent = `Vorige keer (${formatShortDate(last.date)}): ${formatSetsLine(last.entry.sets)}${rirText}`;
     body.appendChild(previous);
   }
+
+  if (advice) body.appendChild(renderAdviceBox("Advies vandaag", advice));
 
   for (let i = 1; i <= exercise.sets; i++) {
     const setRow = document.createElement("div");
@@ -323,7 +357,8 @@ async function renderExerciseBlock(exercise, day, index) {
 
     const repsInput = document.createElement("input");
     repsInput.type = "number";
-    repsInput.placeholder = "reps";
+    repsInput.inputMode = "numeric";
+    repsInput.placeholder = advice?.targetReps ? `${advice.targetReps[i - 1]}+` : "reps";
     repsInput.className = "reps-input";
     repsInput.setAttribute("aria-label", `${exercise.name}, set ${i}, herhalingen`);
     // Filling in reps means the set is done, so that's when the rest starts.
@@ -337,15 +372,191 @@ async function renderExerciseBlock(exercise, day, index) {
     body.appendChild(setRow);
   }
 
+  body.appendChild(renderRirPicker(block, exercise));
+
+  const liveAdvice = document.createElement("div");
+  liveAdvice.className = "advice-live";
+  body.appendChild(liveAdvice);
+
+  // Recomputed from what's on screen on every change in this block, so the
+  // advice for next time is visible the moment the last set + RIR are in.
+  const refreshAdvice = () => {
+    const sets = [...block.querySelectorAll(".set-row")].map(parseSetRow).filter(Boolean);
+    liveAdvice.innerHTML = "";
+    if (!sets.length) return;
+    const rir = block.dataset.rir === "" ? null : Number(block.dataset.rir);
+    const rec = recommendNext(sets, rir, exercise);
+    if (!rec) return;
+    if (rir == null && rec.action === "increase") {
+      const hint = document.createElement("p");
+      hint.className = "advice-hint";
+      hint.textContent = "Kies je RIR om het advies voor volgende keer te zien.";
+      liveAdvice.appendChild(hint);
+      return;
+    }
+    liveAdvice.appendChild(renderAdviceBox("Advies volgende training", rec));
+  };
+  block._refreshAdvice = refreshAdvice;
+  block.addEventListener("input", refreshAdvice);
+
   block.appendChild(body);
   return block;
+}
+
+const ADVICE_CLASS = { increase: "advice-up", hold: "advice-hold", improve: "advice-hold", "too-heavy": "advice-warn" };
+
+function renderAdviceBox(title, rec) {
+  const box = document.createElement("div");
+  box.className = `advice-box ${ADVICE_CLASS[rec.action] || ""}`;
+
+  const heading = document.createElement("p");
+  heading.className = "advice-title";
+  heading.textContent = `${title}: ${rec.label}`;
+  box.appendChild(heading);
+
+  const main = document.createElement("p");
+  main.className = "advice-main";
+  main.textContent = [formatAdviceWeight(rec), formatTargetReps(rec)].filter(Boolean).join(" · ");
+  box.appendChild(main);
+
+  const detail = document.createElement("p");
+  detail.className = "advice-detail";
+  detail.textContent = rec.detail;
+  box.appendChild(detail);
+  return box;
+}
+
+// Five big buttons, no extra screen: tap to choose, tap again to clear.
+function renderRirPicker(block, exercise) {
+  const wrap = document.createElement("div");
+  wrap.className = "rir-picker";
+
+  const question = document.createElement("p");
+  question.className = "rir-question";
+  question.id = `rir-q-${exercise.id}`;
+  question.textContent = "Hoeveel reps had je nog over na je laatste set?";
+  wrap.appendChild(question);
+
+  const row = document.createElement("div");
+  row.className = "rir-buttons";
+  row.setAttribute("role", "group");
+  row.setAttribute("aria-labelledby", question.id);
+  RIR_OPTIONS.forEach((value) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rir-btn";
+    btn.dataset.rir = String(value);
+    btn.textContent = formatRir(value);
+    btn.setAttribute("aria-label", `RIR ${formatRir(value)}`);
+    btn.setAttribute("aria-pressed", "false");
+    btn.addEventListener("click", () => {
+      const next = block.dataset.rir === String(value) ? "" : String(value);
+      setBlockRir(block, next);
+      navigator.vibrate?.(10);
+      // Buttons don't fire "input"; this one bubbles to the form so the draft,
+      // ring and live advice all update exactly as for a typed set.
+      block.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    row.appendChild(btn);
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function setBlockRir(block, value) {
+  block.dataset.rir = value;
+  block.querySelectorAll(".rir-btn").forEach((btn) => {
+    const active = btn.dataset.rir === value;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+}
+
+// --- Cardio na training ----------------------------------------------------
+// Logged on the session, never as an exercise entry: it must show up in the
+// history but stay out of volume, progression and the progress ring.
+
+async function findLastCardio() {
+  const sessions = await storage.getSessions();
+  return sessions.find((s) => s.cardio?.minutes > 0)?.cardio || null;
+}
+
+function cardioFields(form) {
+  return {
+    minutes: form.querySelector(".cardio-minutes"),
+    inclinePct: form.querySelector(".cardio-incline"),
+    speedKmh: form.querySelector(".cardio-speed"),
+  };
+}
+
+function collectCardioRaw(form) {
+  const fields = cardioFields(form);
+  return Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input.value]));
+}
+
+// Null unless minutes is a real positive number; incline/speed are optional.
+function parseCardio(form) {
+  const raw = collectCardioRaw(form);
+  const minutes = parseDecimal(raw.minutes);
+  if (!(minutes > 0)) return null;
+  const inclinePct = parseDecimal(raw.inclinePct);
+  const speedKmh = parseDecimal(raw.speedKmh);
+  return {
+    type: "incline-walk",
+    minutes,
+    inclinePct: Number.isNaN(inclinePct) ? null : inclinePct,
+    speedKmh: Number.isNaN(speedKmh) ? null : speedKmh,
+  };
+}
+
+function renderCardioSection(lastCardio) {
+  const details = document.createElement("details");
+  details.className = "cardio-section";
+
+  const summary = document.createElement("summary");
+  summary.textContent = "Cardio na training (optioneel)";
+  details.appendChild(summary);
+
+  const grid = document.createElement("div");
+  grid.className = "cardio-grid";
+  const field = (labelText, className, placeholder) => {
+    const label = document.createElement("label");
+    label.className = "cardio-field";
+    const caption = document.createElement("span");
+    caption.textContent = labelText;
+    label.appendChild(caption);
+    const input = makeDecimalInput(className, placeholder);
+    label.appendChild(input);
+    grid.appendChild(label);
+    return input;
+  };
+  const minutes = field("Minuten", "cardio-minutes", "10");
+  const incline = field("Helling %", "cardio-incline", "13");
+  const speed = field("km/u", "cardio-speed", "3.5");
+  details.appendChild(grid);
+
+  if (lastCardio) {
+    const sameBtn = document.createElement("button");
+    sameBtn.type = "button";
+    sameBtn.className = "btn btn-small cardio-same";
+    sameBtn.textContent = `Zelfde als vorige keer (${formatCardio(lastCardio)})`;
+    sameBtn.addEventListener("click", () => {
+      minutes.value = lastCardio.minutes ?? "";
+      incline.value = lastCardio.inclinePct ?? "";
+      speed.value = lastCardio.speedKmh ?? "";
+      details.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    details.appendChild(sameBtn);
+  }
+
+  return details;
 }
 
 // Tappable summary row: exercise name, its suggested-weight chip, and a
 // chevron that flips the block's collapsed/expanded state. Kept separate
 // from the sets themselves (`.exercise-body`) so collapsing one exercise
 // never touches the inputs the form actually reads on save.
-function renderExerciseHeader(exercise, suggestedWeight, block) {
+function renderExerciseHeader(exercise, suggestedWeight, block, advice) {
   const header = document.createElement("button");
   header.type = "button";
   header.className = "exercise-header";
@@ -375,7 +586,9 @@ function renderExerciseHeader(exercise, suggestedWeight, block) {
 
   const chip = document.createElement("span");
   chip.className = suggestedWeight != null ? "chip" : "chip chip-muted";
-  chip.textContent = suggestedWeight != null ? `${suggestedWeight} kg` : "–";
+  if (advice?.action === "increase") chip.classList.add("chip-up");
+  if (advice?.action === "too-heavy") chip.classList.add("chip-warn");
+  chip.textContent = suggestedWeight != null ? `${advice?.action === "increase" ? "↑ " : ""}${suggestedWeight} kg` : "–";
   right.appendChild(chip);
 
   right.appendChild(renderChevronIcon());
@@ -420,14 +633,6 @@ function formatShortDate(date) {
   return new Date(date).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
 
-function computeSuggestedWeight(last, exercise, day) {
-  if (!last || !last.entry.sets.length) return null;
-  const lastSet = last.entry.sets[last.entry.sets.length - 1];
-  if (lastSet.weight == null || lastSet.reps == null) return null;
-  const hitTop = hitTopOfRange(lastSet.reps, exercise.repMax);
-  return suggestNextWeight(lastSet.weight, hitTop, isLegDay(day.name));
-}
-
 function buildSessionFromForm(form, day) {
   const entries = [];
   form.querySelectorAll(".exercise-block").forEach((block) => {
@@ -437,15 +642,19 @@ function buildSessionFromForm(form, day) {
       if (parsed) sets.push(parsed);
     });
     if (sets.length) {
-      entries.push({
+      const entry = {
         exerciseId: block.dataset.exerciseId,
         exerciseName: block.dataset.exerciseName,
         sets,
-      });
+      };
+      // Only when chosen: an entry without lastSetRir means "not logged",
+      // exactly like every session from before RIR existed.
+      if (block.dataset.rir !== "") entry.lastSetRir = Number(block.dataset.rir);
+      entries.push(entry);
     }
   });
 
-  return {
+  const session = {
     id: crypto.randomUUID(),
     date: new Date().toISOString(),
     dayId: day.id,
@@ -453,4 +662,7 @@ function buildSessionFromForm(form, day) {
     note: form.querySelector(".session-note-input").value.trim(),
     entries,
   };
+  const cardio = parseCardio(form);
+  if (cardio) session.cardio = cardio;
+  return session;
 }

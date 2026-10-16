@@ -7,6 +7,9 @@ import {
 import { downloadBackup, restoreBackupFromFile } from "./backup.js";
 import { confirmDialog } from "./ui-dialog.js";
 import { showToast } from "./ui-toast.js";
+import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
+import { incrementFor } from "./progression.js";
+import { getSchemaSnapshot, restoreSchemaSnapshot } from "./migrations.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -48,6 +51,8 @@ export async function renderSchemaEditor(container) {
   container.appendChild(addDayBtn);
   container.appendChild(renderTrainingSettings());
   container.appendChild(renderBackupSettings());
+  const snapshotSection = await renderSnapshotSettings(container);
+  if (snapshotSection) container.appendChild(snapshotSection);
   container.appendChild(renderSyncSettings());
 }
 
@@ -127,6 +132,44 @@ function renderBackupSettings() {
   });
 
   section.appendChild(status);
+  return section;
+}
+
+// Only shown when the schema migration saved a copy of the old schema: a way
+// back if the new plan doesn't suit, without touching any logged session.
+async function renderSnapshotSettings(rootContainer) {
+  const snapshot = await getSchemaSnapshot();
+  if (!snapshot?.days?.length) return null;
+
+  const section = document.createElement("section");
+  section.className = "sync-settings";
+  const heading = document.createElement("h3");
+  heading.textContent = "Vorig schema";
+  section.appendChild(heading);
+
+  const help = document.createElement("p");
+  help.className = "sync-help";
+  const savedOn = new Date(snapshot.savedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+  help.textContent = `Bij de update naar het nieuwe schema is je oude schema bewaard (${savedOn}). Terugzetten vervangt alleen het schema; je sessies, metingen en foto's blijven zoals ze zijn.`;
+  section.appendChild(help);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-secondary";
+  btn.textContent = "Oud schema terugzetten";
+  btn.addEventListener("click", async () => {
+    const confirmed = await confirmDialog({
+      title: "Oud schema terugzetten",
+      body: "Je huidige schema wordt vervangen door het schema van vóór de update. Doorgaan?",
+      confirmLabel: "Terugzetten",
+      danger: true,
+    });
+    if (!confirmed) return;
+    await restoreSchemaSnapshot();
+    showToast("Oud schema teruggezet");
+    renderSchemaEditor(rootContainer);
+  });
+  section.appendChild(btn);
   return section;
 }
 
@@ -381,7 +424,7 @@ function renderExerciseRow(day, exercise, rootContainer, index) {
   row.className = "exercise-row";
 
   const label = document.createElement("span");
-  label.textContent = `${exercise.name} — ${exercise.sets} sets, ${exercise.repMin}-${exercise.repMax} reps`;
+  label.textContent = `${exercise.name} — ${exercise.sets} × ${exercise.repMin}–${exercise.repMax} · +${incrementFor(exercise)} kg`;
   row.appendChild(label);
 
   const actions = document.createElement("div");
@@ -530,7 +573,7 @@ function renderDayNameForm({ value = "", submitLabel, onSubmit, onCancel }) {
   return form;
 }
 
-// The same four fields for both adding and editing an exercise; `exercise`
+// The same five fields for both adding and editing an exercise; `exercise`
 // is omitted when adding, and the defaults match what the old prompt flow
 // silently assumed.
 function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
@@ -545,11 +588,15 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
   const setsInput = numberInput(exercise?.sets ?? 4);
   const repMinInput = numberInput(exercise?.repMin ?? 6);
   const repMaxInput = numberInput(exercise?.repMax ?? 10);
+  // Free decimal, never rounded: Basic-Fit stacks step 2.2/2.3/2.4/2.7 kg.
+  const incrementInput = makeDecimalInput("inline-form-input", "2.5");
+  incrementInput.value = exercise ? incrementFor(exercise) : 2.5;
 
   form.appendChild(formRow("Oefening", nameInput));
   form.appendChild(formRow("Sets", setsInput));
   form.appendChild(formRow("Reps min.", repMinInput));
   form.appendChild(formRow("Reps max.", repMaxInput));
+  form.appendChild(formRow("Stap (kg)", incrementInput));
 
   const error = document.createElement("p");
   error.className = "inline-form-error";
@@ -562,6 +609,7 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
     const sets = parseInt(setsInput.value, 10);
     const repMin = parseInt(repMinInput.value, 10);
     const repMax = parseInt(repMaxInput.value, 10);
+    const incrementKg = parseDecimal(incrementInput.value);
 
     // Written as `!(x >= 1)` so a blank field (NaN) fails too.
     if (!name) {
@@ -580,7 +628,11 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
       error.textContent = "Maximale reps mogen niet lager zijn dan de minimale.";
       return;
     }
-    onSubmit({ name, sets, repMin, repMax });
+    if (!(incrementKg > 0)) {
+      error.textContent = "Vul een gewichtsstap in, bijv. 2.5 of 2,3.";
+      return;
+    }
+    onSubmit({ name, sets, repMin, repMax, incrementKg });
   });
 
   focusOnInsert(nameInput);

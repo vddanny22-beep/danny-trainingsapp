@@ -1,14 +1,12 @@
 import * as storage from "./storage.js";
-import { renderSparkline } from "./sparkline.js";
-import { bestOneRepMax } from "./volume-stats.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
+import { formatRir, RIR_OPTIONS } from "./progression.js";
+import { formatCardio } from "./formatters.js";
 import { confirmDialog } from "./ui-dialog.js";
 import { showToast } from "./ui-toast.js";
 
-// Renders the Geschiedenis tab: a session list (newest first) and a lightweight
-// per-exercise progress trend, built from the same session history storage.js
-// already tracks. No charting library — a small hand-rolled SVG polyline is
-// plenty for 5-10 data points per exercise.
+// Renders the Geschiedenis tab: the session list (newest first), each
+// editable/deletable. Per-exercise trends live on the Voortgang tab.
 export async function renderHistoryView(container) {
   const sessions = await storage.getSessions();
   container.innerHTML = "";
@@ -24,7 +22,6 @@ export async function renderHistoryView(container) {
     return;
   }
 
-  container.appendChild(renderProgressSection(sessions));
   container.appendChild(renderSessionList(sessions, container));
 }
 
@@ -99,9 +96,16 @@ function renderSessionDetails(session) {
   session.entries.forEach((entry) => {
     const detail = document.createElement("li");
     const setsText = entry.sets.map((s) => `${s.weight}kg×${s.reps}`).join(", ");
-    detail.textContent = `${entry.exerciseName}: ${setsText}`;
+    const rirText = entry.lastSetRir != null ? ` · RIR ${formatRir(entry.lastSetRir)}` : "";
+    detail.textContent = `${entry.exerciseName}: ${setsText}${rirText}`;
     details.appendChild(detail);
   });
+  if (session.cardio?.minutes > 0) {
+    const cardio = document.createElement("li");
+    cardio.className = "session-cardio";
+    cardio.textContent = `Cardio: ${formatCardio(session.cardio)}`;
+    details.appendChild(cardio);
+  }
   wrap.appendChild(details);
 
   if (session.note) {
@@ -183,8 +187,37 @@ function renderSessionEditor(session, container) {
       block.appendChild(row);
     });
 
+    // RIR stays correctable afterwards — it drives next time's advice.
+    const rirSelect = document.createElement("select");
+    rirSelect.className = "inline-form-input rir-select";
+    rirSelect.add(new Option("RIR: niet gelogd", ""));
+    RIR_OPTIONS.forEach((value) => rirSelect.add(new Option(`RIR ${formatRir(value)}`, String(value))));
+    rirSelect.value = entry.lastSetRir != null ? String(entry.lastSetRir) : "";
+    block.appendChild(rirSelect);
+
     form.appendChild(block);
   });
+
+  const cardioBlock = document.createElement("fieldset");
+  cardioBlock.className = "exercise-block cardio-edit";
+  const cardioLegend = document.createElement("legend");
+  cardioLegend.textContent = "Cardio na training";
+  cardioBlock.appendChild(cardioLegend);
+  const cardioInput = (labelText, value) => {
+    const input = makeDecimalInput("inline-form-input", "");
+    input.value = value ?? "";
+    const row = document.createElement("label");
+    row.className = "inline-form-row";
+    const caption = document.createElement("span");
+    caption.textContent = labelText;
+    row.append(caption, input);
+    cardioBlock.appendChild(row);
+    return input;
+  };
+  const cardioMinutes = cardioInput("Minuten", session.cardio?.minutes);
+  const cardioIncline = cardioInput("Helling %", session.cardio?.inclinePct);
+  const cardioSpeed = cardioInput("km/u", session.cardio?.speedKmh);
+  form.appendChild(cardioBlock);
 
   const noteInput = document.createElement("textarea");
   noteInput.className = "session-note-input";
@@ -214,7 +247,7 @@ function renderSessionEditor(session, container) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const entries = [];
-    form.querySelectorAll(".exercise-block").forEach((block) => {
+    form.querySelectorAll(".exercise-block[data-entry-index]").forEach((block) => {
       const original = session.entries[Number(block.dataset.entryIndex)];
       const sets = [];
       block.querySelectorAll(".set-row").forEach((row) => {
@@ -222,7 +255,12 @@ function renderSessionEditor(session, container) {
         const reps = parseInt(row.querySelector(".reps-input").value, 10);
         if (!Number.isNaN(weight) && !Number.isNaN(reps)) sets.push({ weight, reps });
       });
-      if (sets.length) entries.push({ ...original, sets });
+      if (!sets.length) return;
+      const updated = { ...original, sets };
+      const rirValue = block.querySelector(".rir-select").value;
+      if (rirValue === "") delete updated.lastSetRir;
+      else updated.lastSetRir = Number(rirValue);
+      entries.push(updated);
     });
 
     if (!entries.length) {
@@ -230,12 +268,26 @@ function renderSessionEditor(session, container) {
       return;
     }
 
-    await storage.saveSession({
+    const updatedSession = {
       ...session,
       entries,
       note: noteInput.value.trim(),
       date: dateInput.value ? withDatePart(session.date, dateInput.value) : session.date,
-    });
+    };
+    const minutes = parseDecimal(cardioMinutes.value);
+    if (minutes > 0) {
+      const incline = parseDecimal(cardioIncline.value);
+      const speed = parseDecimal(cardioSpeed.value);
+      updatedSession.cardio = {
+        ...(session.cardio || { type: "incline-walk" }),
+        minutes,
+        inclinePct: Number.isNaN(incline) ? null : incline,
+        speedKmh: Number.isNaN(speed) ? null : speed,
+      };
+    } else {
+      delete updatedSession.cardio;
+    }
+    await storage.saveSession(updatedSession);
     renderHistoryView(container);
   });
 
@@ -249,64 +301,4 @@ function smallButton(text, onClick) {
   btn.textContent = text;
   btn.addEventListener("click", onClick);
   return btn;
-}
-
-function renderProgressSection(sessions) {
-  const section = document.createElement("section");
-  const heading = document.createElement("h3");
-  heading.textContent = "Voortgang per oefening";
-  section.appendChild(heading);
-
-  // Chronological (oldest first) for trend plotting, opposite of the session list.
-  const chronological = [...sessions].reverse();
-
-  const byExercise = new Map();
-  for (const session of chronological) {
-    for (const entry of session.entries) {
-      if (!entry.sets.length) continue;
-      const topWeight = Math.max(...entry.sets.map((s) => s.weight));
-      if (!byExercise.has(entry.exerciseName)) byExercise.set(entry.exerciseName, { weights: [], oneRepMaxes: [] });
-      const trend = byExercise.get(entry.exerciseName);
-      trend.weights.push(topWeight);
-      trend.oneRepMaxes.push(bestOneRepMax(entry));
-    }
-  }
-
-  const list = document.createElement("div");
-  list.className = "progress-list";
-  for (const [exerciseName, trend] of byExercise.entries()) {
-    list.appendChild(renderProgressRow(exerciseName, trend));
-  }
-  section.appendChild(list);
-  return section;
-}
-
-// Rounded to 1 decimal to avoid floating-point noise like
-// "42.4 - 39 = 3.3999999999999986".
-function formatDelta(first, last) {
-  const delta = Math.round((last - first) * 10) / 10;
-  if (delta === 0) return "gelijk gebleven";
-  return delta > 0 ? `+${delta}kg` : `${delta}kg`;
-}
-
-function renderProgressRow(exerciseName, { weights, oneRepMaxes }) {
-  const row = document.createElement("div");
-  row.className = "progress-row";
-
-  const label = document.createElement("div");
-  label.className = "progress-label";
-  label.textContent = `${exerciseName}: ${weights[0]}kg → ${weights[weights.length - 1]}kg (${formatDelta(weights[0], weights[weights.length - 1])})`;
-  row.appendChild(label);
-
-  // The plotted line is the estimated 1RM, not the raw top weight. This app's
-  // progression rule only adds weight once you reach the top of the rep range,
-  // so the weight trend is a staircase that sits flat for weeks while the reps
-  // — and the actual strength — keep climbing.
-  const estimate = document.createElement("div");
-  estimate.className = "progress-sublabel";
-  estimate.textContent = `Geschat 1RM: ${oneRepMaxes[0]}kg → ${oneRepMaxes[oneRepMaxes.length - 1]}kg (${formatDelta(oneRepMaxes[0], oneRepMaxes[oneRepMaxes.length - 1])})`;
-  row.appendChild(estimate);
-
-  row.appendChild(renderSparkline(oneRepMaxes));
-  return row;
 }

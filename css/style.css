@@ -1481,3 +1481,226 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     transform: none;
   }
 }
+
+/* --- RIR, advies en cardio (Vandaag) ------------------------------------ */
+
+.chip-up {
+  background: rgba(163, 230, 53, 0.28);
+}
+
+.chip-warn {
+  background: rgba(255, 176, 32, 0.18);
+  color: #ffb020;
+}
+
+.advice-box {
+  margin: 0 0 var(--space-3);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--text-secondary);
+  background: var(--bg-card-alt);
+}
+
+.advice-box p {
+  margin: 0;
+}
+
+.advice-box.advice-up {
+  border-left-color: var(--accent);
+}
+
+.advice-box.advice-warn {
+  border-left-color: #ffb020;
+}
+
+.advice-title {
+  font-size: var(--font-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+}
+
+.advice-main {
+  font-size: var(--font-md);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.advice-up .advice-main {
+  color: var(--accent);
+}
+
+.advice-detail {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.advice-live .advice-box {
+  margin: var(--space-3) 0 0;
+}
+
+.advice-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.rir-picker {
+  margin-top: var(--space-3);
+}
+
+.rir-question {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.rir-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rir-btn {
+  min-height: 52px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-lg);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rir-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.cardio-section {
+  margin: var(--space-3) 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.cardio-section summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
+.cardio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.cardio-field {
+  display: grid;
+  gap: 4px;
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+}
+
+.cardio-field input {
+  min-width: 0;
+  width: 100%;
+  min-height: 47px;
+  padding: 10px;
+  text-align: center;
+  font-size: var(--font-md);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text-primary);
+}
+
+.cardio-same {
+  margin: var(--space-3) 0 0;
+  width: 100%;
+  min-height: 44px;
+  white-space: normal;
+}
+
+.session-cardio {
+  color: var(--accent);
+}
+
+.rir-select {
+  margin-top: var(--space-2);
+  width: 100%;
+}
+
+/* --- Voortgang: overzicht en per oefening ------------------------------- */
+
+.overview-heading {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recomp-hint {
+  margin: var(--space-2) 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(163, 230, 53, 0.1);
+  font-size: var(--font-sm);
+}
+
+.exercise-progress {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  padding: 0 14px;
+  margin-bottom: var(--space-2);
+}
+
+.exercise-progress summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 52px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.exercise-progress summary::-webkit-details-marker {
+  display: none;
+}
+
+.exercise-progress-name {
+  font-weight: var(--fw-semibold);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.exercise-progress[open] {
+  padding-bottom: 12px;
+}
+
+.exercise-progress-line {
+  margin: 0 0 4px;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
