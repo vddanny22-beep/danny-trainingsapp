@@ -7,6 +7,8 @@ import {
   MUSCLES, makeMuscleResolver, recentMuscleSets, plannedMuscleSets, volumeStatus, formatSets,
 } from "./muscles.js";
 import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
+import { renderSamsungImport } from "./samsung-import.js";
+import { showToast } from "./ui-toast.js";
 import {
   getTargets, setTargets, latestWeightKg, dailyAverages, dailySeries,
 } from "./daily-log.js";
@@ -445,6 +447,10 @@ async function renderDailySection(rootContainer, bodyLogs) {
     renderProgressView(rootContainer);
   });
   section.appendChild(form);
+  section.appendChild(renderSamsungImport((message) => {
+    showToast(message, 4000);
+    renderProgressView(rootContainer);
+  }));
   return section;
 }
 
