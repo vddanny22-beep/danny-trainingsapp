@@ -5,12 +5,15 @@
 // charts); `height` lets a caller ask for a taller chart — the viewBox scales
 // with it so the line's proportions stay correct instead of being stretched
 // by CSS.
-export function renderSparkline(values, { area = false, height = 40 } = {}) {
+// `goal` draws a dashed horizontal reference line (e.g. goal weight) and is
+// included in the scale so it's always on the chart.
+export function renderSparkline(values, { area = false, height = 40, goal = null } = {}) {
   const width = 240;
   const padding = 4;
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const scaleValues = goal != null ? [...values, goal] : values;
+  const min = Math.min(...scaleValues);
+  const max = Math.max(...scaleValues);
   const range = max - min || 1; // avoid divide-by-zero when every value is equal
 
   const points = values.map((v, i) => {
@@ -49,6 +52,17 @@ export function renderSparkline(values, { area = false, height = 40 } = {}) {
     polygon.setAttribute("points", fillPoints.join(" "));
     polygon.setAttribute("fill", `url(#${gradientId})`);
     svg.appendChild(polygon);
+  }
+
+  if (goal != null) {
+    const y = (height - padding - ((goal - min) / range) * (height - 2 * padding)).toFixed(1);
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", padding);
+    line.setAttribute("x2", width - padding);
+    line.setAttribute("y1", y);
+    line.setAttribute("y2", y);
+    line.setAttribute("class", "sparkline-goal");
+    svg.appendChild(line);
   }
 
   const polyline = document.createElementNS(svgNS, "polyline");

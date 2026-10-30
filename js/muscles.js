@@ -148,3 +148,34 @@ export function muscleHeat(key, sets) {
 export function formatSets(sets) {
   return Number.isInteger(sets) ? String(sets) : sets.toFixed(1).replace(".", ",");
 }
+
+// --- Recovery ---------------------------------------------------------------
+// Rough model, meant as a guide, not physiology: a muscle needs about 24 h
+// plus 6 h per hard set it got (primary 1, secondary ½) to recover, capped
+// at 72 h. Several recent sessions: the least-recovered one counts.
+const HOUR_MS = 60 * 60 * 1000;
+
+export function recoveryHoursFor(sets) {
+  return Math.min(72, 24 + 6 * sets);
+}
+
+// Returns { [muscle]: { recovered: 0..1, hoursLeft, sets, trainedAt } } for
+// every muscle; untouched muscles are fully recovered (recovered = 1).
+export function muscleRecovery(sessions, resolve, now = new Date()) {
+  const result = Object.fromEntries(MUSCLE_KEYS.map((key) => [key, { recovered: 1, hoursLeft: 0, sets: 0, trainedAt: null }]));
+  for (const session of sessions) {
+    const at = new Date(session.date).getTime();
+    const elapsed = (now.getTime() - at) / HOUR_MS;
+    if (elapsed < 0 || elapsed >= 72) continue;
+    const sets = sessionMuscleSets(session, resolve);
+    for (const key of MUSCLE_KEYS) {
+      if (!(sets[key] > 0)) continue;
+      const needed = recoveryHoursFor(sets[key]);
+      const recovered = Math.min(1, elapsed / needed);
+      if (recovered < result[key].recovered) {
+        result[key] = { recovered, hoursLeft: Math.max(0, Math.ceil(needed - elapsed)), sets: sets[key], trainedAt: session.date };
+      }
+    }
+  }
+  return result;
+}

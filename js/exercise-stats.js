@@ -24,6 +24,7 @@ export function historyByExercise(sessions) {
         date: session.date,
         sets: entry.sets,
         lastSetRir: entry.lastSetRir ?? null,
+        deload: Boolean(session.deload),
         topWeight: Math.max(...entry.sets.map((s) => s.weight)),
         e1rm: bestOneRepMax(entry),
         volume: entryVolume(entry),
@@ -105,7 +106,7 @@ export function trainingOverview(sessions, now = new Date()) {
 // Simple pattern flags per exercise for the AI Coach: stagnation, constant
 // RIR 0, dropping reps. Uses the last `n` entries.
 export function exerciseFlags(history, n = 4) {
-  const recent = (history || []).slice(-n);
+  const recent = (history || []).filter((p) => !p.deload).slice(-n);
   const flags = [];
   if (recent.length < 3) return flags;
   const e1rms = recent.map((p) => p.e1rm);

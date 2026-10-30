@@ -125,9 +125,12 @@ export async function getLastSession() {
 // it did in the Sheet.
 // Returns { date, entry } — the date so the Vandaag tab can say *when* you
 // last did this exercise, not just what you lifted.
+// Deload sessions (half the sets on purpose) are skipped: next-time advice
+// must build on the last normal training, not on the light week.
 export async function getLastEntryForExerciseName(exerciseName) {
   const sessions = await getSessions();
   for (const session of sessions) {
+    if (session.deload) continue;
     const entry = session.entries.find((e) => e.exerciseName === exerciseName);
     if (entry) return { date: session.date, entry };
   }

@@ -4,11 +4,12 @@ import { volumeByWeek, volumeByCategory, percentChange, weeklyTrend } from "./vo
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { historyByExercise, summariseExercise, trainingOverview, hasProgressed, recordsBySession, formatRecord } from "./exercise-stats.js";
 import {
-  MUSCLES, makeMuscleResolver, recentMuscleSets, plannedMuscleSets, volumeStatus, formatSets,
+  MUSCLES, makeMuscleResolver, recentMuscleSets, plannedMuscleSets, volumeStatus, formatSets, muscleRecovery, muscleLabel,
 } from "./muscles.js";
 import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
 import { renderSamsungImport } from "./samsung-import.js";
 import { showToast } from "./ui-toast.js";
+import { getGoalWeight, setGoalWeight, weightRate, assessTempo, formatKgSigned } from "./body-goal.js";
 import {
   getTargets, setTargets, latestWeightKg, dailyAverages, dailySeries,
 } from "./daily-log.js";
@@ -44,6 +45,7 @@ export async function renderProgressView(container) {
   }
   const recompHint = renderRecompHint(logs);
   if (recompHint) container.appendChild(recompHint);
+  container.appendChild(renderGoalBox(container, logs));
 
   container.appendChild(renderTrainingOverview(sessions));
   container.appendChild(renderMuscleSection(sessions, days));
@@ -113,6 +115,72 @@ function renderStatCard(label, points, unit) {
   }
 
   return card;
+}
+
+// Goal weight + tempo: how far to go, how fast it's going, and whether that
+// pace protects muscle. Editable in place.
+function renderGoalBox(rootContainer, logs) {
+  const box = document.createElement("div");
+  box.className = "goal-box";
+  const points = metricPoints(logs, "weightKg");
+  const current = points.length ? points[points.length - 1].value : null;
+  const goal = getGoalWeight();
+  const rate = weightRate(points);
+  const tempo = current != null ? assessTempo(rate, current, goal) : null;
+
+  const lines = [];
+  if (goal != null && current != null) {
+    const remaining = Math.round((goal - current) * 10) / 10;
+    lines.push(["goal-main", remaining === 0 ? `Doel ${goal} kg bereikt!` : `Doel ${goal} kg · nog ${formatKgSigned(remaining)} kg`]);
+  } else if (goal != null) {
+    lines.push(["goal-main", `Doel ${goal} kg`]);
+  }
+  if (rate) {
+    lines.push(["goal-rate", `Tempo: ${formatKgSigned(rate.perWeekKg)} kg/week (${formatKgSigned(rate.perWeekPct)}%/week, laatste 4 weken)`]);
+  } else if (points.length) {
+    lines.push(["goal-rate", "Tempo: weeg je minstens 3× over een week om je tempo te zien."]);
+  }
+  if (tempo) {
+    lines.push([`goal-verdict level-${tempo.level}`, tempo.text]);
+    if (tempo.weeksToGoal) lines.push(["goal-eta", `In dit tempo bereik je je doel over ±${tempo.weeksToGoal} ${tempo.weeksToGoal === 1 ? "week" : "weken"}.`]);
+  }
+  lines.forEach(([cls, text]) => {
+    const p = document.createElement("p");
+    p.className = cls;
+    p.textContent = text;
+    box.appendChild(p);
+  });
+
+  const form = document.createElement("form");
+  form.className = "goal-form";
+  form.noValidate = true;
+  form.hidden = true; // opened by the button below
+  const input = makeDecimalInput("inline-form-input", "Doelgewicht (kg)");
+  input.setAttribute("aria-label", "Doelgewicht in kg");
+  input.value = goal ?? "";
+  const save = document.createElement("button");
+  save.type = "submit";
+  save.className = "btn btn-small btn-accent";
+  save.textContent = "Opslaan";
+  form.append(input, save);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = parseDecimal(input.value);
+    setGoalWeight(value > 0 ? Math.round(value * 10) / 10 : null);
+    renderProgressView(rootContainer);
+  });
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "btn btn-small";
+  toggle.textContent = goal != null ? "Doel wijzigen" : "Doelgewicht instellen";
+  toggle.addEventListener("click", () => {
+    form.hidden = !form.hidden;
+    if (!form.hidden) input.focus();
+  });
+  box.appendChild(toggle);
+  box.appendChild(form);
+  return box;
 }
 
 // Waist down while weight holds steady = the recomp working. Over the last
@@ -269,9 +337,12 @@ function renderMuscleSection(sessions, days) {
 
   const resolve = makeMuscleResolver(days);
   const views = {
-    recent: { label: "Laatste 7 dagen", sets: recentMuscleSets(sessions, resolve) },
-    planned: { label: "Volgens schema", sets: plannedMuscleSets(days) },
+    recent: { label: "7 dagen", sets: recentMuscleSets(sessions, resolve) },
+    planned: { label: "Schema", sets: plannedMuscleSets(days) },
+    recovery: { label: "Herstel", recovery: muscleRecovery(sessions, resolve) },
   };
+  const caption = document.createElement("p");
+  caption.className = "sync-help";
 
   const toggle = document.createElement("div");
   toggle.className = "segmented";
@@ -290,9 +361,24 @@ function renderMuscleSection(sessions, days) {
       b.setAttribute("aria-pressed", String(active));
     });
     mapSlot.innerHTML = "";
-    mapSlot.appendChild(renderBodyMap(view.sets, { label: `Spierkaart, ${view.label.toLowerCase()}` }));
-    mapSlot.appendChild(renderBodyMapLegend());
-    renderMuscleList(list, view.sets);
+    if (view.recovery) {
+      const r = view.recovery;
+      mapSlot.appendChild(renderBodyMap({}, {
+        label: "Spierkaart, herstel",
+        heat: (k) => r[k].recovered,
+        describe: (k) => `${muscleLabel(k)}: ${r[k].hoursLeft ? `nog ~${r[k].hoursLeft} u herstel` : "hersteld"}`,
+      }));
+      mapSlot.appendChild(renderBodyMapLegend("net getraind", "hersteld"));
+      caption.textContent = "Schatting: een spier herstelt in ongeveer 24 uur + 6 uur per harde set (max. 72 uur). Een richtlijn, geen meting — voel je je nog niet hersteld, dan klopt dat ook.";
+      renderRecoveryList(list, r);
+    } else {
+      mapSlot.appendChild(renderBodyMap(view.sets, { label: `Spierkaart, ${view.label.toLowerCase()}` }));
+      mapSlot.appendChild(renderBodyMapLegend());
+      caption.textContent = view === views.planned
+        ? "Wat je schema per week voorschrijft als je elke dag één keer traint. Hoofdspier telt 1, hulpspier ½. Doel voor spiergroei meestal ±10–20 sets per week."
+        : "Harde sets per spiergroep in de laatste 7 dagen: hoofdspier telt 1, hulpspier ½. Doel voor spiergroei meestal ±10–20 sets per week.";
+      renderMuscleList(list, view.sets);
+    }
   };
   Object.entries(views).forEach(([key, view]) => {
     const btn = document.createElement("button");
@@ -305,13 +391,40 @@ function renderMuscleSection(sessions, days) {
 
   section.appendChild(toggle);
   section.appendChild(mapSlot);
-  const caption = document.createElement("p");
-  caption.className = "sync-help";
-  caption.textContent = "Harde sets per spiergroep: hoofdspier telt 1, hulpspier ½. Doel voor spiergroei meestal ±10–20 sets per week.";
   section.appendChild(caption);
   section.appendChild(list);
   show("recent");
   return section;
+}
+
+// Recovering muscles first, least recovered at the top; the rest summarised.
+function renderRecoveryList(list, recovery) {
+  list.innerHTML = "";
+  const recovering = MUSCLES.filter(({ key }) => recovery[key].hoursLeft > 0)
+    .sort((a, b) => recovery[b.key].hoursLeft - recovery[a.key].hoursLeft);
+  if (!recovering.length) {
+    const row = document.createElement("div");
+    row.className = "muscle-row status-ok";
+    row.innerHTML = '<span class="muscle-row-name">Alle spieren zijn hersteld</span><span></span><span class="muscle-row-status">klaar</span>';
+    list.appendChild(row);
+    return;
+  }
+  recovering.forEach(({ key, label }) => {
+    const r = recovery[key];
+    const row = document.createElement("div");
+    row.className = `muscle-row ${r.recovered < 0.5 ? "status-low" : "status-ok"}`;
+    const name = document.createElement("span");
+    name.className = "muscle-row-name";
+    name.textContent = label;
+    const value = document.createElement("span");
+    value.className = "muscle-row-value";
+    value.textContent = `${Math.round(r.recovered * 100)}%`;
+    const chip = document.createElement("span");
+    chip.className = "muscle-row-status";
+    chip.textContent = `nog ~${r.hoursLeft} u`;
+    row.append(name, value, chip);
+    list.appendChild(row);
+  });
 }
 
 function renderMuscleList(list, setsByMuscle) {
@@ -627,7 +740,7 @@ function renderTrends(logs) {
   const weightPoints = metricPoints(logs, "weightKg");
   const waistPoints = metricPoints(logs, "waistCm");
 
-  if (weightPoints.length >= 2) wrap.appendChild(renderMetricTrend("Gewicht", weightPoints, "kg"));
+  if (weightPoints.length >= 2) wrap.appendChild(renderMetricTrend("Gewicht", weightPoints, "kg", getGoalWeight()));
   if (waistPoints.length >= 2) wrap.appendChild(renderMetricTrend("Taille", waistPoints, "cm"));
 
   if (!wrap.children.length) {
@@ -643,7 +756,7 @@ function formatSigned(value, unit) {
   return `${value > 0 ? "+" : ""}${value}${unit}`;
 }
 
-function renderMetricTrend(label, points, unit) {
+function renderMetricTrend(label, points, unit, goal = null) {
   const box = document.createElement("div");
   const first = points[0];
   const last = points[points.length - 1];
@@ -666,7 +779,13 @@ function renderMetricTrend(label, points, unit) {
     : `${formatSigned(totalDelta, unit)} totaal sinds ${formatShortDate(first.date)}`;
   box.appendChild(detail);
 
-  box.appendChild(renderSparkline(points.map((p) => p.value), { area: true, height: 70 }));
+  box.appendChild(renderSparkline(points.map((p) => p.value), { area: true, height: 70, goal }));
+  if (goal != null) {
+    const legend = document.createElement("div");
+    legend.className = "trend-rate";
+    legend.textContent = `Stippellijn = doel (${goal} ${unit})`;
+    box.appendChild(legend);
+  }
   return box;
 }
 

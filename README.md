@@ -59,12 +59,15 @@ it with its own icon, launching full-screen like a real app.
 - `service-worker.js` — caches the app for offline use
 - `css/style.css` — mobile-first styling
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
-- `js/progression.js` — progressive-overload advice from ALL sets + the RIR of the last set (increase / hold / improve reps / possibly too heavy), with a per-exercise `incrementKg`
+- `js/progression.js` — progressive-overload advice from ALL sets + the RIR of the last set (increase / hold / improve reps / possibly too heavy), with a per-exercise `incrementKg` or the machine's real `weightStack` (the next existing weight on the machine)
 - `js/migrations.js` — versioned one-time schema migrations (`schemaVersion` in the IndexedDB `meta` store); v2 = the hypertrophy plan from `seed.js`, with a snapshot of the old schema that can be restored from the Schema tab
 - `js/exercise-stats.js` — pure per-exercise / whole-training stats for Voortgang and the AI Coach
 - `js/formatters.js` — shared display helpers (set lines, cardio)
 - `js/muscles.js` — which muscles each exercise trains (name-based defaults, overridable per exercise in the Schema tab) and hard sets per muscle group (primary 1, secondary ½) against a weekly hypertrophy target
-- `js/body-map.js` — the front/back body map (inline SVG, works offline) used after a workout and on Voortgang
+- `js/body-map.js` — the front/back body map (inline SVG, works offline) used after a workout and on Voortgang, in three views: volume over 7 days, volume per the schema, and estimated recovery per muscle
+- `js/body-paths.js` — the anatomical muscle outlines, from [MuscleMap](https://github.com/melihcolpan/MuscleMap) by Melih Colpan (MIT, licence text in the file)
+- `js/body-goal.js` — goal weight and the weight-change tempo (regression over 4 weeks) with a plain-language verdict on whether the pace protects muscle
+- `js/deload.js` — suggests a deload week when ≥3 exercises stall for 3 sessions; a deload is half the sets at the same weight, and its sessions don't count for next-time advice
 - `js/daily-log.js` — protein and steps per day (Vandaag card, Voortgang averages, targets); stored in the IndexedDB `dailyLogs` store and included in backups
 - `js/samsung-import.js` — imports steps and body weight from a Samsung Health CSV export (Samsung Health → Instellingen → Persoonlijke gegevens downloaden). There is no direct link: Samsung Health / Health Connect are only reachable from a native Android app. The parser is tolerant of column prefixes, shows a preview first, only adds/updates, and re-importing the same export doesn't duplicate anything
 - `js/volume-stats.js` — pure aggregation helpers: weekly training volume, split per movement type, and Epley 1RM estimates

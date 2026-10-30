@@ -1,77 +1,40 @@
 import { muscleLabel, muscleHeat, formatSets } from "./muscles.js";
+import { FRONT_PARTS, BACK_PARTS, FRONT_VIEWBOX, BACK_VIEWBOX } from "./body-paths.js";
 
-// Hand-drawn front/back body figure as inline SVG — no image files or
-// libraries, so it renders offline at the gym. Each muscle region is filled
-// by how much it was trained; colours come from css/style.css (.bm-*).
-//
-// Coordinates: each figure is drawn in a 100 × 222 box, left half only for
-// paired muscles; the right half is mirrored around x = 50.
+// Front/back body map as inline SVG — anatomical outlines from MuscleMap
+// (see body-paths.js for source and licence), no image files, so it renders
+// offline at the gym. Each muscle region is filled by how much it was
+// trained (or how recovered it is); colours come from css/style.css (.bm-*).
 
-const W = 100;
-const H = 222;
-const GAP = 16;
+// MuscleMap slug → this app's muscle key (muscles.js). "base" = drawn as
+// neutral body; null = skipped. MuscleMap also ships finer sub-regions
+// (upper/lower chest, inner/outer quad, ...) that overlap their parent
+// muscle; those are skipped, the parent region carries the colour.
+// The deltoid is split the other way round: the whole deltoid is the side
+// head, and the front/rear sub-region is drawn on top of it.
+const FRONT_MAP = {
+  chest: "chest", abs: "abs", obliques: "abs", biceps: "biceps", triceps: "triceps",
+  deltoids: "sideDelts", frontDeltoid: "frontDelts", quadriceps: "quads", calves: "calves",
+  trapezius: "upperBack", forearm: "forearms",
+  adductors: "base", neck: "base", hands: "base", knees: "base", tibialis: "base", ankles: "base",
+  feet: "base", head: "base", hair: "base", serratus: "base",
+};
+const BACK_MAP = {
+  trapezius: "upperBack", upperBack: "lats", deltoids: "sideDelts", rearDeltoid: "rearDelts",
+  triceps: "triceps", lowerBack: "lowerBack", forearm: "forearms", gluteal: "glutes",
+  hamstring: "hamstrings", calves: "calves",
+  adductors: "base", neck: "base", hands: "base", ankles: "base", feet: "base", head: "base", hair: "base",
+  rhomboids: "base", rotatorCuff: "base",
+};
 
-const mirrorX = (x) => W - x;
-
-// Non-muscle silhouette, drawn first.
-const BASE = [
-  ["circle", { cx: 50, cy: 14, r: 10 }],
-  ["rect", { x: 45, y: 23, width: 10, height: 9, rx: 3 }],
-  ["rect", { x: 33, y: 33, width: 34, height: 68, rx: 11 }],
-  ["rect", { x: 19, y: 39, width: 12, height: 37, rx: 6, pair: true }],
-  ["rect", { x: 16, y: 73, width: 11, height: 35, rx: 5, pair: true }],
-  ["ellipse", { cx: 21.5, cy: 113, rx: 4.5, ry: 6, pair: true }],
-  ["rect", { x: 35, y: 96, width: 30, height: 19, rx: 7 }],
-  ["rect", { x: 33, y: 110, width: 15, height: 54, rx: 7, pair: true }],
-  ["rect", { x: 35, y: 163, width: 11, height: 45, rx: 5, pair: true }],
-  ["ellipse", { cx: 40.5, cy: 212, rx: 6, ry: 3.5, pair: true }],
-];
-
-const FRONT = [
-  ["frontDelts", "ellipse", { cx: 31, cy: 44, rx: 6.5, ry: 6, pair: true }],
-  ["sideDelts", "ellipse", { cx: 23.5, cy: 47, rx: 4, ry: 6.5, pair: true }],
-  ["chest", "polygon", { points: [[35, 42], [42, 38.5], [49.4, 39.5], [49.4, 57.5], [42, 60], [35, 55]], pair: true }],
-  ["biceps", "ellipse", { cx: 25, cy: 62, rx: 4.8, ry: 10, pair: true }],
-  ["forearms", "ellipse", { cx: 21.5, cy: 90, rx: 4.2, ry: 13, pair: true }],
-  ["abs", "rect", { x: 41, y: 62, width: 18, height: 34, rx: 5 }],
-  ["quads", "ellipse", { cx: 40.5, cy: 135, rx: 7.3, ry: 24, pair: true }],
-  ["calves", "ellipse", { cx: 40.5, cy: 184, rx: 4.5, ry: 15, pair: true }],
-];
-
-const BACK = [
-  ["upperBack", "polygon", { points: [[40, 33], [60, 33], [66, 44], [50, 60], [34, 44]] }],
-  ["rearDelts", "ellipse", { cx: 30.5, cy: 44.5, rx: 6.5, ry: 6, pair: true }],
-  ["sideDelts", "ellipse", { cx: 23.5, cy: 47, rx: 4, ry: 6.5, pair: true }],
-  ["lats", "polygon", { points: [[34, 50], [48, 60], [48, 84], [39, 80], [35, 66]], pair: true }],
-  ["triceps", "ellipse", { cx: 25, cy: 62, rx: 4.8, ry: 10, pair: true }],
-  ["forearms", "ellipse", { cx: 21.5, cy: 90, rx: 4.2, ry: 13, pair: true }],
-  ["lowerBack", "rect", { x: 42, y: 80, width: 16, height: 17, rx: 4 }],
-  ["glutes", "ellipse", { cx: 42, cy: 106, rx: 8.5, ry: 9, pair: true }],
-  ["hamstrings", "ellipse", { cx: 40.5, cy: 138, rx: 7, ry: 21, pair: true }],
-  ["calves", "ellipse", { cx: 40.5, cy: 181, rx: 5.5, ry: 15, pair: true }],
-];
-
+const GAP = 40;
+const CAPTION_SPACE = 70;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function el(tag, attrs) {
   const node = document.createElementNS(SVG_NS, tag);
   Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
   return node;
-}
-
-// One shape (plus its mirrored twin when `pair`), offset by `dx`.
-function shapes(tag, { pair, points, ...attrs }, dx) {
-  const make = (mirror) => {
-    if (tag === "polygon") {
-      const pts = points.map(([x, y]) => `${(mirror ? mirrorX(x) : x) + dx},${y}`).join(" ");
-      return el("polygon", { points: pts });
-    }
-    const a = { ...attrs };
-    if ("cx" in a) a.cx = (mirror ? mirrorX(a.cx) : a.cx) + dx;
-    if ("x" in a) a.x = (mirror ? W - a.x - a.width : a.x) + dx;
-    return el(tag, a);
-  };
-  return pair ? [make(false), make(true)] : [make(false)];
 }
 
 // Five heat steps — discrete classes keep the colours consistent with CSS
@@ -84,38 +47,50 @@ function heatClass(heat) {
   return "bm-4";
 }
 
-function drawFigure(svg, muscles, setsByMuscle, dx, caption, heatOf) {
-  BASE.forEach(([tag, attrs]) => shapes(tag, attrs, dx).forEach((node) => {
-    node.setAttribute("class", "bm-base");
-    svg.appendChild(node);
-  }));
-  muscles.forEach(([key, tag, attrs]) => {
-    const sets = setsByMuscle[key] || 0;
-    const group = el("g", { class: `bm-muscle ${heatClass(heatOf(key, sets))}`, "data-muscle": key });
-    const title = el("title", {});
-    title.textContent = `${muscleLabel(key)}: ${formatSets(sets)} sets`;
-    group.appendChild(title);
-    shapes(tag, attrs, dx).forEach((node) => group.appendChild(node));
-    svg.appendChild(group);
+// Draws one view, shifted so its viewBox starts at x = `dx`. Base parts go
+// first so muscles sit on top; within muscles the source order is kept,
+// which puts the front/rear deltoid sub-region over the whole deltoid.
+function drawView(svg, parts, map, viewBox, dx, caption, paint) {
+  const [vx, vy, vw, vh] = viewBox;
+  const view = el("g", { transform: `translate(${dx - vx} ${-vy})` });
+  const ordered = [...parts.filter((p) => map[p.slug] === "base"), ...parts.filter((p) => map[p.slug] && map[p.slug] !== "base")];
+  ordered.forEach(({ slug, d }) => {
+    const key = map[slug];
+    const group = key === "base" ? el("g", { class: "bm-base" }) : el("g", paint(key));
+    if (key !== "base") {
+      const title = el("title", {});
+      title.textContent = paint.title(key);
+      group.appendChild(title);
+    }
+    d.forEach((path) => group.appendChild(el("path", { d: path })));
+    view.appendChild(group);
   });
-  const label = el("text", { x: dx + W / 2, y: H - 1, "text-anchor": "middle", class: "bm-caption" });
+  svg.appendChild(view);
+  const label = el("text", { x: dx + vw / 2, y: vh + CAPTION_SPACE - 18, "text-anchor": "middle", class: "bm-caption" });
   label.textContent = caption;
   svg.appendChild(label);
 }
 
 // `setsByMuscle`: { chest: 12, triceps: 9.5, ... }. Returns an <svg>.
 // By default the heat is relative to each muscle's WEEKLY target; pass
-// `fullAt` (sets) for a single workout, where ~4 sets for one muscle is already a full dose.
-export function renderBodyMap(setsByMuscle, { label = "Spierkaart", fullAt = null } = {}) {
-  const heatOf = fullAt ? (key, sets) => sets / fullAt : muscleHeat;
-  const svg = el("svg", { viewBox: `0 0 ${W * 2 + GAP} ${H + 6}`, class: "body-map", role: "img", "aria-label": label });
-  drawFigure(svg, FRONT, setsByMuscle, 0, "Voor", heatOf);
-  drawFigure(svg, BACK, setsByMuscle, W + GAP, "Achter", heatOf);
+// `fullAt` (sets) for a single workout, where ~4 sets for one muscle is
+// already a full dose. `heat` (key → 0..1.5) and `describe` (key → tooltip)
+// override both, e.g. for the recovery view.
+export function renderBodyMap(setsByMuscle, { label = "Spierkaart", fullAt = null, heat = null, describe = null } = {}) {
+  const heatOf = heat || (fullAt ? (key) => (setsByMuscle[key] || 0) / fullAt : (key) => muscleHeat(key, setsByMuscle[key] || 0));
+  const paint = (key) => ({ class: `bm-muscle ${heatClass(heatOf(key))}`, "data-muscle": key });
+  paint.title = describe || ((key) => `${muscleLabel(key)}: ${formatSets(setsByMuscle[key] || 0)} sets`);
+
+  const width = FRONT_VIEWBOX[2] + GAP + BACK_VIEWBOX[2];
+  const height = FRONT_VIEWBOX[3] + CAPTION_SPACE;
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, class: "body-map", role: "img", "aria-label": label });
+  drawView(svg, FRONT_PARTS, FRONT_MAP, FRONT_VIEWBOX, 0, "Voor", paint);
+  drawView(svg, BACK_PARTS, BACK_MAP, BACK_VIEWBOX, FRONT_VIEWBOX[2] + GAP, "Achter", paint);
   return svg;
 }
 
 // "weinig ■■■■ op doel" — bm-4 means the muscle reached the bottom of its
-// weekly target range.
+// weekly target range (or, in the recovery view, is fully recovered).
 export function renderBodyMapLegend(lowText = "weinig", highText = "op doel") {
   const legend = document.createElement("div");
   legend.className = "bm-legend";

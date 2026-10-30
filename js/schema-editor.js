@@ -8,7 +8,7 @@ import { downloadBackup, restoreBackupFromFile } from "./backup.js";
 import { confirmDialog } from "./ui-dialog.js";
 import { showToast } from "./ui-toast.js";
 import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
-import { incrementFor } from "./progression.js";
+import { incrementFor, weightStackOf, parseWeightStack, formatWeightStack } from "./progression.js";
 import { getSchemaSnapshot, restoreSchemaSnapshot } from "./migrations.js";
 import { MUSCLES, musclesFor, defaultMusclesFor } from "./muscles.js";
 
@@ -420,17 +420,19 @@ function renderDayCard(day, rootContainer, days, index) {
   return card;
 }
 
-// Which muscles an exercise trains belongs to the movement, not to one day:
-// Push and Push 2 each hold their own "Chest Press". Copy the setting to every
-// same-named exercise on other days so the body map can't disagree with itself.
-async function syncMusclesByName(savedDayId, name, muscles) {
+// Which muscles an exercise trains, and the machine's weight step and
+// stack, belong to the movement/machine, not to one day: Push and Push 2
+// each hold their own "Chest Press". Copy them to every same-named exercise
+// on other days, so Monday's and Thursday's advice can't disagree. Sets and
+// rep ranges stay per day.
+async function syncMachineByName(savedDayId, { name, muscles, incrementKg, weightStack }) {
   const days = await storage.getDays();
   for (const day of days) {
     if (day.id === savedDayId) continue;
     if (!day.exercises.some((e) => e.name === name)) continue;
     await storage.saveDay({
       ...day,
-      exercises: day.exercises.map((e) => (e.name === name ? { ...e, muscles } : e)),
+      exercises: day.exercises.map((e) => (e.name === name ? { ...e, muscles, incrementKg, weightStack } : e)),
     });
   }
 }
@@ -440,7 +442,8 @@ function renderExerciseRow(day, exercise, rootContainer, index) {
   row.className = "exercise-row";
 
   const label = document.createElement("span");
-  label.textContent = `${exercise.name} — ${exercise.sets} × ${exercise.repMin}–${exercise.repMax} · +${incrementFor(exercise)} kg`;
+  const step = weightStackOf(exercise).length ? "machine-reeks" : `+${incrementFor(exercise)} kg`;
+  label.textContent = `${exercise.name} — ${exercise.sets} × ${exercise.repMin}–${exercise.repMax} · ${step}`;
   row.appendChild(label);
 
   const actions = document.createElement("div");
@@ -462,7 +465,7 @@ function renderExerciseRow(day, exercise, rootContainer, index) {
           e.id === exercise.id ? { ...e, ...values } : e
         );
         await storage.saveDay({ ...day, exercises: updatedExercises });
-        await syncMusclesByName(day.id, values.name, values.muscles);
+        await syncMachineByName(day.id, values);
         renderSchemaEditor(rootContainer);
       },
     }));
@@ -679,6 +682,20 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
   form.appendChild(formRow("Reps max.", repMaxInput));
   form.appendChild(formRow("Stap (kg)", incrementInput));
 
+  // Optional real weight stack of this machine. When filled, the advice
+  // jumps to the next weight in this list instead of adding the step above.
+  const stackInput = document.createElement("textarea");
+  stackInput.className = "inline-form-input weight-stack-input";
+  stackInput.rows = 2;
+  stackInput.inputMode = "decimal";
+  stackInput.placeholder = "bijv. 45,5; 47,7; 50; 52,3";
+  stackInput.value = formatWeightStack(weightStackOf(exercise));
+  form.appendChild(formRow("Gewichten machine (optioneel)", stackInput));
+  const stackHelp = document.createElement("p");
+  stackHelp.className = "inline-form-caption";
+  stackHelp.textContent = "De echte standen van deze machine, gescheiden door ; of een spatie. Leeg = de stap hierboven gebruiken.";
+  form.appendChild(stackHelp);
+
   const musclePicker = renderMusclePicker(exercise ? musclesFor(exercise) : defaultMusclesFor(""));
   form.appendChild(musclePicker.el);
   // A new exercise gets the name-based default as soon as its name is typed,
@@ -717,11 +734,16 @@ function renderExerciseForm({ exercise, submitLabel, onSubmit, onCancel }) {
       error.textContent = "Maximale reps mogen niet lager zijn dan de minimale.";
       return;
     }
+    const weightStack = parseWeightStack(stackInput.value);
+    if (weightStack === null) {
+      error.textContent = "Gewichten machine: gebruik getallen gescheiden door ; of een spatie, bijv. 45,5; 47,7; 50.";
+      return;
+    }
     if (!(incrementKg > 0)) {
       error.textContent = "Vul een gewichtsstap in, bijv. 2.5 of 2,3.";
       return;
     }
-    onSubmit({ name, sets, repMin, repMax, incrementKg, muscles: musclePicker.get() });
+    onSubmit({ name, sets, repMin, repMax, incrementKg, weightStack, muscles: musclePicker.get() });
   });
 
   focusOnInsert(nameInput);

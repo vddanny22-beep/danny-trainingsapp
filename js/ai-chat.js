@@ -1,10 +1,12 @@
 import * as storage from "./storage.js";
-import { formatRir, incrementFor } from "./progression.js";
+import { formatRir, incrementFor, weightStackOf } from "./progression.js";
 import { historyByExercise, trainingOverview, exerciseFlags } from "./exercise-stats.js";
 import { formatCardio } from "./formatters.js";
 import { MUSCLES, makeMuscleResolver, recentMuscleSets, plannedMuscleSets, formatSets } from "./muscles.js";
 import { recordsBySession, formatRecord } from "./exercise-stats.js";
 import { getTargets, dailyAverages } from "./daily-log.js";
+import { getDeloadState, stalledExercises } from "./deload.js";
+import { getGoalWeight, weightRate } from "./body-goal.js";
 
 // AI Coach: calls the Gemini API directly from the browser with a key the
 // user pastes in themselves and which never leaves this device (localStorage
@@ -83,7 +85,7 @@ function buildScheduleContext(days) {
   if (!days.length) return "";
   const lines = days.map((day) => {
     const exerciseNames = day.exercises
-      .map((e) => `${e.name} ${e.sets}×${e.repMin}–${e.repMax} (stap ${incrementFor(e)} kg)`)
+      .map((e) => `${e.name} ${e.sets}×${e.repMin}–${e.repMax} (${weightStackOf(e).length ? `machinestanden ${weightStackOf(e).join("/")} kg` : `stap ${incrementFor(e)} kg`})`)
       .join(", ") || "geen oefeningen";
     return `- ${day.name}: ${exerciseNames}`;
   });
@@ -107,7 +109,7 @@ function buildSessionsContext(sessions) {
     // The note carries the subjective side — poor sleep, a niggling shoulder —
     // that the numbers alone don't show but that changes the advice.
     const noteSuffix = session.note ? ` [notitie: ${session.note}]` : "";
-    return `- ${dateLabel} (${session.dayName}): ${entryLines || "geen sets gelogd"}${cardioSuffix}${noteSuffix}`;
+    return `- ${dateLabel} (${session.dayName}${session.deload ? ", deload" : ""}): ${entryLines || "geen sets gelogd"}${cardioSuffix}${noteSuffix}`;
   });
   return `\n\nRecent gelogde trainingssessies van de gebruiker (nieuwste eerst):\n${lines.join("\n")}`;
 }
@@ -172,6 +174,23 @@ function buildRecordsContext(sessions) {
   return `\n\nPersoonlijke records laatste 30 dagen:\n${records.map((r) => `- ${new Date(r.date).toLocaleDateString("nl-NL")}: ${formatRecord(r)}`).join("\n")}`;
 }
 
+// Deload status, stalled exercises and the weight goal/tempo — the context
+// the coach needs to judge recovery and the pace of the cut.
+function buildPlanStatusContext(days, sessions, bodyLogs) {
+  const lines = [];
+  const deload = getDeloadState();
+  if (deload.active) lines.push(`Deload-week actief t/m ${new Date(deload.activeUntil).toLocaleDateString("nl-NL")} (halve sets, zelfde gewicht, RIR 3+).`);
+  else if (deload.lastEndedAt) lines.push(`Laatste deload afgerond op ${new Date(deload.lastEndedAt).toLocaleDateString("nl-NL")}.`);
+  const stalled = stalledExercises(sessions, days);
+  lines.push(stalled.length ? `Oefeningen zonder e1RM-progressie over de laatste 3 trainingen: ${stalled.join(", ")}.` : "Geen oefeningen die 3 trainingen stilstaan.");
+  const goal = getGoalWeight();
+  const points = [...bodyLogs].reverse().filter((l) => l.weightKg != null).map((l) => ({ date: l.date, value: l.weightKg }));
+  const rate = weightRate(points);
+  if (goal) lines.push(`Doelgewicht: ${goal} kg.`);
+  if (rate) lines.push(`Gewichtstempo laatste 4 weken: ${rate.perWeekKg} kg/week (${rate.perWeekPct}%/week).`);
+  return `\n\nStatus:\n${lines.map((l) => `- ${l}`).join("\n")}`;
+}
+
 // Protein and steps — the coach otherwise has to guess the nutrition side.
 function buildDailyContext(dailyLogs, bodyLogs) {
   const weight = bodyLogs.find((l) => l.weightKg != null)?.weightKg ?? null;
@@ -197,7 +216,8 @@ async function buildUserContext() {
     buildMuscleContext(days, sessions) +
     buildRecordsContext(sessions) +
     buildBodyLogsContext(bodyLogs) +
-    buildDailyContext(dailyLogs, bodyLogs)
+    buildDailyContext(dailyLogs, bodyLogs) +
+    buildPlanStatusContext(days, sessions, bodyLogs)
   );
 }
 

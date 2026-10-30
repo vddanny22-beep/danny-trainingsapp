@@ -1719,9 +1719,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   fill: #232823;
 }
 
-.body-map .bm-muscle {
+.body-map .bm-muscle,
+.body-map .bm-base {
   stroke: #101211;
-  stroke-width: 0.6;
+  stroke-width: 2.5;
 }
 
 .bm-0 { fill: #343b35; }
@@ -1732,7 +1733,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .bm-caption {
   fill: var(--text-secondary);
-  font-size: 7px;
+  font-size: 40px;
   letter-spacing: 0.08em;
 }
 
@@ -2072,4 +2073,113 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   width: 22px;
   height: 22px;
   accent-color: var(--accent);
+}
+
+/* --- Spierkaart: 3 weergaven, gewichtsdoel, deload, machinereeks -------- */
+
+.segmented {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.sparkline-goal {
+  stroke: var(--text-secondary);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+
+.goal-box {
+  margin: var(--space-3) 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.goal-box p {
+  margin: 0 0 6px;
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+}
+
+.goal-box .goal-main {
+  font-size: var(--font-md);
+  font-weight: var(--fw-bold);
+}
+
+.goal-box .goal-rate,
+.goal-box .goal-eta {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-verdict {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-alt);
+}
+
+.goal-verdict.level-ok { background: rgba(163, 230, 53, 0.12); color: var(--accent); }
+.goal-verdict.level-warn { background: rgba(255, 176, 32, 0.14); color: #ffb020; }
+
+.goal-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.goal-form[hidden] {
+  display: none;
+}
+
+.goal-box > .btn-small {
+  margin: 4px 0 0;
+  min-height: 40px;
+}
+
+.deload-banner {
+  margin: 0 0 var(--space-4);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid #ffb020;
+  background: rgba(255, 176, 32, 0.08);
+}
+
+.deload-banner.active {
+  border-color: #6fb3ff;
+  background: rgba(111, 179, 255, 0.08);
+}
+
+.deload-title {
+  margin: 0 0 4px;
+  font-weight: var(--fw-bold);
+}
+
+.deload-body {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.deload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.deload-actions .btn-small {
+  margin: 0;
+  min-height: 44px;
+}
+
+.advice-box.advice-deload {
+  border-left-color: #6fb3ff;
+}
+
+.weight-stack-input {
+  font-family: inherit;
+  resize: vertical;
 }
