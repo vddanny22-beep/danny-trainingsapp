@@ -40,6 +40,35 @@ export function incrementFor(exercise) {
   return inc > 0 ? inc : defaultIncrementKg(exercise?.name);
 }
 
+// A machine's real weight stack (Basic-Fit stacks step 2.2/2.3/2.7 kg, not a
+// tidy 2.5): optional, sorted ascending, set in the schema editor. When it's
+// there, "increase" means the next weight that actually exists on the
+// machine instead of current + incrementKg.
+export function weightStackOf(exercise) {
+  const stack = (exercise?.weightStack || []).map(Number).filter((w) => w > 0);
+  return [...new Set(stack)].sort((a, b) => a - b);
+}
+
+export function nextWeightFor(exercise, currentWeight) {
+  const next = weightStackOf(exercise).find((w) => w > currentWeight + 1e-9);
+  return next != null ? next : addKg(currentWeight, incrementFor(exercise));
+}
+
+// "45,5; 47,7 50" → [45.5, 47.7, 50]. Comma is the decimal separator here, so
+// weights are separated by semicolons, spaces or new lines. Returns null when
+// any part isn't a number (so a typo is reported, not silently dropped).
+export function parseWeightStack(text) {
+  const parts = String(text || "").split(/[;\s]+/).map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) return [];
+  const values = parts.map((p) => (/^\d+([.,]\d+)?$/.test(p) ? Number(p.replace(",", ".")) : NaN));
+  if (values.some((v) => !(v > 0))) return null;
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+
+export function formatWeightStack(stack) {
+  return (stack || []).map((w) => String(w).replace(".", ",")).join("; ");
+}
+
 // Kills float noise (52 + 2.3 = 54.300000000000004) without rounding a real
 // machine weight to some "nicer" step: two decimals keeps 2.2/2.3/2.7 kg
 // stacks exactly as entered.
@@ -117,7 +146,7 @@ export function recommendNext(sets, lastSetRir, exercise) {
     );
   }
 
-  const nextWeight = addKg(currentWeight, incrementFor(exercise));
+  const nextWeight = nextWeightFor(exercise, currentWeight);
   let detail;
   if (rir == null) detail = `Alle sets op ${repMax} reps (geen RIR gelogd).`;
   else if (rir >= RIR_MAX) detail = `Alle sets op ${repMax} reps met RIR ${formatRir(rir)}: dit gewicht was waarschijnlijk duidelijk te licht. Verhogen, eventueel met meer dan één stap.`;

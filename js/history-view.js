@@ -56,7 +56,7 @@ function renderSessionItem(session, container, records) {
 
   const summary = document.createElement("div");
   summary.className = "session-summary";
-  summary.textContent = `${formatSessionDate(session)} — ${session.dayName} (${session.entries.length} oefeningen)${records.length ? ` · 🏆 ${records.length}` : ""}`;
+  summary.textContent = `${formatSessionDate(session)} — ${session.dayName} (${session.entries.length} oefeningen)${session.deload ? " · deload" : ""}${records.length ? ` · 🏆 ${records.length}` : ""}`;
   if (records.length) summary.title = records.map((r) => r.exerciseName).join(", ");
   header.appendChild(summary);
 

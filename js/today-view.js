@@ -1,6 +1,6 @@
 import * as storage from "./storage.js";
 import {
-  recommendNext, incrementFor, formatRir, formatAdviceWeight, formatTargetReps, RIR_OPTIONS,
+  recommendNext, incrementFor, weightStackOf, formatRir, formatAdviceWeight, formatTargetReps, RIR_OPTIONS,
 } from "./progression.js";
 import { startRestTimer, stopRestTimer } from "./rest-timer.js";
 import { loadDraft, saveDraft, clearDraft, getDraftDayId } from "./workout-draft.js";
@@ -12,6 +12,7 @@ import { renderDailyCard } from "./daily-log.js";
 import { recordsBySession, formatRecord } from "./exercise-stats.js";
 import { makeMuscleResolver, sessionMuscleSets } from "./muscles.js";
 import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
+import { getDeloadState, deloadSets, renderDeloadBanner } from "./deload.js";
 
 // Every render bumps this; a render that finds it changed after an await has
 // been overtaken (e.g. the day picker changed while it was still loading the
@@ -132,15 +133,23 @@ function autoExpandBlocks(form) {
 
 async function renderForDay(container, days, selectedDayId) {
   const token = ++renderToken;
-  const day = days.find((d) => d.id === selectedDayId) || days[0];
+  const deload = getDeloadState().active;
+  const plannedDay = days.find((d) => d.id === selectedDayId) || days[0];
+  // During a deload week every exercise is shown with half its sets; the
+  // schema itself is untouched.
+  const day = deload
+    ? { ...plannedDay, exercises: plannedDay.exercises.map((ex) => ({ ...ex, sets: deloadSets(ex.sets) })) }
+    : plannedDay;
   container.innerHTML = "";
 
   const totalSets = day.exercises.reduce((sum, ex) => sum + ex.sets, 0);
   const { hero, ringSvg } = renderHero(day, totalSets);
   container.appendChild(hero);
   const dailyCard = await renderDailyCard();
+  const deloadBanner = renderDeloadBanner(await storage.getSessions(), days, () => renderForDay(container, days, day.id));
   if (token !== renderToken) return;
   container.appendChild(dailyCard);
+  if (deloadBanner) container.appendChild(deloadBanner);
 
   const picker = document.createElement("select");
   picker.className = "day-picker";
@@ -168,9 +177,10 @@ async function renderForDay(container, days, selectedDayId) {
 
   const form = document.createElement("form");
   form.className = "today-form";
+  if (deload) form.dataset.deload = "1";
 
   for (const [index, exercise] of day.exercises.entries()) {
-    form.appendChild(await renderExerciseBlock(exercise, day, index));
+    form.appendChild(await renderExerciseBlock(exercise, day, index, deload));
   }
 
   form.appendChild(renderCardioSection(await findLastCardio()));
@@ -347,7 +357,7 @@ function renderDraftNotice(container, days, day) {
   return notice;
 }
 
-async function renderExerciseBlock(exercise, day, index) {
+async function renderExerciseBlock(exercise, day, index, deload = false) {
   const block = document.createElement("div");
   block.className = "exercise-block";
   block.dataset.exerciseId = exercise.id;
@@ -359,16 +369,18 @@ async function renderExerciseBlock(exercise, day, index) {
   // sets (and RIR) shown as "vorige keer".
   const last = await storage.getLastEntryForExerciseName(exercise.name);
   const advice = last ? recommendNext(last.entry.sets, last.entry.lastSetRir, exercise) : null;
-  const suggestedWeight = advice ? advice.nextWeight : null;
+  // Deload: the weight you last worked with, not the next step up.
+  const suggestedWeight = advice ? (deload ? advice.currentWeight : advice.nextWeight) : null;
 
-  block.appendChild(renderExerciseHeader(exercise, suggestedWeight, block, advice));
+  block.appendChild(renderExerciseHeader(exercise, suggestedWeight, block, deload ? null : advice));
 
   const body = document.createElement("div");
   body.className = "exercise-body";
 
   const meta = document.createElement("p");
   meta.className = "exercise-meta";
-  meta.textContent = `Doel: ${exercise.sets} × ${exercise.repMin}–${exercise.repMax} · stap +${incrementFor(exercise)} kg`;
+  const stack = weightStackOf(exercise);
+  meta.textContent = `Doel: ${exercise.sets} × ${exercise.repMin}–${exercise.repMax} · ${stack.length ? `machine-reeks (${stack.length} standen)` : `stap +${incrementFor(exercise)} kg`}`;
   body.appendChild(meta);
 
   // The suggestion alone doesn't say whether you cruised through last time or
@@ -381,7 +393,8 @@ async function renderExerciseBlock(exercise, day, index) {
     body.appendChild(previous);
   }
 
-  if (advice) body.appendChild(renderAdviceBox("Advies vandaag", advice));
+  if (deload) body.appendChild(renderDeloadAdvice(exercise, suggestedWeight));
+  else if (advice) body.appendChild(renderAdviceBox("Advies vandaag", advice));
 
   for (let i = 1; i <= exercise.sets; i++) {
     const setRow = document.createElement("div");
@@ -424,6 +437,7 @@ async function renderExerciseBlock(exercise, day, index) {
   // Recomputed from what's on screen on every change in this block, so the
   // advice for next time is visible the moment the last set + RIR are in.
   const refreshAdvice = () => {
+    if (deload) return; // a deload session doesn't drive next time's advice
     const sets = [...block.querySelectorAll(".set-row")].map(parseSetRow).filter(Boolean);
     liveAdvice.innerHTML = "";
     if (!sets.length) return;
@@ -444,6 +458,22 @@ async function renderExerciseBlock(exercise, day, index) {
 
   block.appendChild(body);
   return block;
+}
+
+function renderDeloadAdvice(exercise, weight) {
+  const box = document.createElement("div");
+  box.className = "advice-box advice-deload";
+  const title = document.createElement("p");
+  title.className = "advice-title";
+  title.textContent = "Deload-week";
+  const main = document.createElement("p");
+  main.className = "advice-main";
+  main.textContent = `${exercise.sets} sets${weight != null ? ` · ${weight} kg (zelfde gewicht)` : ""} · stop op RIR 3+`;
+  const detail = document.createElement("p");
+  detail.className = "advice-detail";
+  detail.textContent = "Licht houden: deze training telt niet mee voor je progressie-advies.";
+  box.append(title, main, detail);
+  return box;
 }
 
 const ADVICE_CLASS = { increase: "advice-up", hold: "advice-hold", improve: "advice-hold", "too-heavy": "advice-warn" };
@@ -707,5 +737,6 @@ function buildSessionFromForm(form, day) {
   };
   const cardio = parseCardio(form);
   if (cardio) session.cardio = cardio;
+  if (form.dataset.deload) session.deload = true;
   return session;
 }
