@@ -6,7 +6,7 @@
 // this file byte-identical, so no update is ever detected and every
 // installed client keeps serving the stale cached copy forever, no matter
 // how many times they close and reopen the app.
-const CACHE_NAME = "trainingsapp-v29";
+const CACHE_NAME = "trainingsapp-v30";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -81,6 +81,18 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+
+  // Kaylee's study pages change often. Always prefer the network here so
+  // homework updates appear immediately instead of being stuck in the app cache.
+  if (url.origin === self.location.origin && url.pathname.includes("/kaylee-engels/")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
