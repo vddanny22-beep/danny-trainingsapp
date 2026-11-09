@@ -100,10 +100,14 @@ export function targetRepsFor(sets, targetSets, repMin, repMax) {
 //   targetReps: number[]  (only for non-increase actions — the reps to beat)
 // }
 export function recommendNext(sets, lastSetRir, exercise) {
-  const valid = (sets || []).filter((s) => Number.isFinite(s?.weight) && Number.isFinite(s?.reps));
-  if (!valid.length) return null;
+  const logged = (sets || []).filter((s) => Number.isFinite(s?.weight) && Number.isFinite(s?.reps));
+  if (!logged.length) return null;
 
-  const targetSets = exercise.sets || valid.length;
+  const targetSets = exercise.sets || logged.length;
+  // Only the prescribed sets count: an extra set on top (or a session logged
+  // when the schema still prescribed more sets) is a bonus, not a reason to
+  // hold the weight back.
+  const valid = logged.slice(0, targetSets);
   const { repMin, repMax } = exercise;
   const last = valid[valid.length - 1];
   const currentWeight = last.weight;

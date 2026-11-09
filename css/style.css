@@ -2183,3 +2183,51 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-family: inherit;
   resize: vertical;
 }
+
+/* --- 6-daagse split: weekdag + focus in de hero, rustdag ---------------- */
+
+.today-hero-weekday {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* visual-refresh.css sets text-transform: none on .today-hero-day; this
+   selector is more specific so the day reads "RUG + BICEPS A". */
+.today-hero .today-hero-day {
+  text-transform: uppercase;
+}
+
+.rest-day-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.rest-day-title {
+  margin: 0 0 6px;
+  font-size: var(--font-lg);
+  font-weight: var(--fw-bold);
+}
+
+.rest-day-body {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.day-card-focus {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-xs);
+  font-weight: var(--fw-regular);
+  color: var(--text-secondary);
+}
+
+.training-goal-setting .segmented button {
+  font-size: var(--font-xs);
+}

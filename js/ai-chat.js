@@ -7,6 +7,7 @@ import { recordsBySession, formatRecord } from "./exercise-stats.js";
 import { getTargets, dailyAverages } from "./daily-log.js";
 import { getDeloadState, stalledExercises } from "./deload.js";
 import { getGoalWeight, weightRate } from "./body-goal.js";
+import { trainingGoalInfo, cardioSummary } from "./training-goal.js";
 
 // AI Coach: calls the Gemini API directly from the browser with a key the
 // user pastes in themselves and which never leaves this device (localStorage
@@ -45,24 +46,30 @@ Richtlijnen:
 - Bij blessures, pijn of medische klachten: stel geen diagnose en verwijs door naar een arts of fysiotherapeut. Je mag wel algemene, voorzichtige trainingsaanpassingen suggereren (bijv. "vermijd belasting die pijn doet").
 - Antwoord bondig en in het Nederlands, tenzij de gebruiker in een andere taal schrijft.
 
-Doel van de gebruiker (body recomposition, nadruk op vetverlies):
-"vet verliezen terwijl spiermassa en kracht zoveel mogelijk worden opgebouwd/behouden."
-De gebruiker traint 5× per week: maandag Push, dinsdag Pull, woensdag Legs, donderdag Push 2, vrijdag Pull 2. Geen complete beginner meer.
+Trainingsstructuur (6-daagse bodybuilding-split, geïnspireerd op de klassieke Ronnie Coleman-indeling, maar zonder zijn extreme volume of gewichten; Basic-Fit Zaandam, vooral machines en kabels). Geen complete beginner meer:
+- ma: Rug + Biceps A (rugdikte, zware horizontale trekkracht)
+- di: Borst + Triceps A (zwaardere borsttraining)
+- wo: Benen (benen slechts 1× per week, daarom iets uitgebreider; géén Romanian Deadlift — gaf rugklachten)
+- do: Schouders (aparte schouderdag, brede schouders / V-taper)
+- vr: Rug + Biceps B (rugbreedte / lats)
+- za: Borst + Triceps B (tweede borstprikkel, meer hypertrofie/pomp)
+- zo: rust
+Dus: zes krachttrainingen per week, rug en borst 2×, benen 1×, ±11–15 werksets per training. Het actuele schema met sets en rep-ranges staat hieronder; dat is leidend als het afwijkt.
 
 Trainingsstrategie waar je advies op aansluit:
-- progressive overload; voornamelijk hypertrofietraining;
-- compounds voornamelijk 6–10 reps, isolatie meestal 8–20 reps;
-- RIR (reps in reserve) wordt na de laatste set van elke oefening gelogd; meestal RIR 1–2, laatste isolatieset eventueel RIR 0–1;
-- gewicht pas verhogen als alle sets de bovengrens halen met RIR ≥ 1; meer reps op hetzelfde gewicht is ook progressie;
-- herstel is belangrijker dan blind meer volume toevoegen — in een calorietekort eerder volume behouden of verlagen dan verhogen;
-- cardio (incline walking) na de training telt niet mee als krachttraining.
+- progressive overload, voornamelijk hypertrofietraining, verschillende rep-ranges per oefening;
+- RIR (reps in reserve) wordt na de laatste set van elke oefening gelogd; compounds meestal RIR 1–2, isolatie meestal RIR 1, laatste isolatieset eventueel RIR 0–1; niet standaard elke set tot falen;
+- gewicht pas verhogen als alle voorgeschreven sets de bovengrens halen met RIR ≥ 1; meer reps op hetzelfde gewicht is ook progressie; nooit automatisch gewicht verlagen;
+- deload: ±2 werksets per oefening, zelfde gewicht, RIR 3–4, doel is herstel;
+- herstel bewaken; geen extreem volume, geen onnodige oefeningen;
+- cardio (incline walking) na de training staat los van de krachtprogressie.
 
-Let in de gegevens hieronder actief op signalen zoals: meerdere weken geen progressie, structureel RIR 0, teruglopende reps, mogelijke herstelproblemen (dalende prestaties over meerdere oefeningen, notities over slaap/vermoeidheid), snelle krachtprogressie (gewicht mag sneller omhoog), een dalende taille bij stabiel gewicht (recomp werkt), spiergroepen die structureel onder of ruim boven hun set-richtlijn zitten, en eiwitinname of stappen die achterblijven bij het doel. Benoem zo'n signaal concreet met oefening en cijfers als het relevant is voor de vraag.`;
+Let in de gegevens hieronder actief op signalen zoals: meerdere weken geen progressie, structureel RIR 0, teruglopende reps, mogelijke herstelproblemen (dalende prestaties over meerdere oefeningen, notities over slaap/vermoeidheid), meerdere slechte trainingen achter elkaar of mogelijke vermoeidheid, de noodzaak van een deload, goede progressive overload, snelle krachtprogressie (gewicht mag sneller omhoog), een dalende taille of stabiel gewicht terwijl de kracht stijgt (recomp werkt), te veel of te weinig trainingsvolume, spiergroepen die structureel onder of ruim boven hun set-richtlijn zitten, en eiwitinname of stappen die achterblijven bij het doel. Benoem zo'n signaal concreet met oefening en cijfers als het relevant is voor de vraag.`;
 
 // How many recent sessions/logs to include — enough for the coach to spot a
 // trend without ballooning every request's token count.
-// Two weeks at 5×/week; per-exercise trends below cover the longer view.
-const RECENT_SESSIONS_COUNT = 10;
+// Two weeks at 6×/week; per-exercise trends below cover the longer view.
+const RECENT_SESSIONS_COUNT = 12;
 const RECENT_BODY_LOGS_COUNT = 10;
 const EXERCISE_TREND_POINTS = 6;
 
@@ -84,10 +91,11 @@ export function clearApiKey() {
 function buildScheduleContext(days) {
   if (!days.length) return "";
   const lines = days.map((day) => {
+    if (day.rest || !day.exercises.length) return `- ${day.name}: rustdag`;
     const exerciseNames = day.exercises
       .map((e) => `${e.name} ${e.sets}×${e.repMin}–${e.repMax} (${weightStackOf(e).length ? `machinestanden ${weightStackOf(e).join("/")} kg` : `stap ${incrementFor(e)} kg`})`)
       .join(", ") || "geen oefeningen";
-    return `- ${day.name}: ${exerciseNames}`;
+    return `- ${day.name}${day.focus ? ` (focus: ${day.focus})` : ""}: ${exerciseNames}`;
   });
   return `\n\nHet huidige trainingsschema van de gebruiker:\n${lines.join("\n")}`;
 }
@@ -174,12 +182,23 @@ function buildRecordsContext(sessions) {
   return `\n\nPersoonlijke records laatste 30 dagen:\n${records.map((r) => `- ${new Date(r.date).toLocaleDateString("nl-NL")}: ${formatRecord(r)}`).join("\n")}`;
 }
 
+// The current phase decides the emphasis of the advice; the schema is the
+// same in both.
+function buildPhaseContext(sessions) {
+  const goal = trainingGoalInfo();
+  const cardio = cardioSummary(sessions);
+  const focus = goal.key === "cut"
+    ? `Huidige fase: CUT / RECOMP. Primair doel: "vet verliezen terwijl spiermassa en kracht zoveel mogelijk worden opgebouwd/behouden." De krachttraining blijft gericht op spiergroei; vetverlies komt vooral uit calorietekort, cardio, dagelijkse activiteit en voeding. Voeg dus géén extra sets toe om calorieën te verbranden: goede werksets + herstel + cardio. Cardio heeft prioriteit: ±15–20 min incline walking na de meeste trainingen (helling 10–13%, 3,5–4,0 km/u). Bewaak herstel extra goed in het tekort.`
+    : `Huidige fase: LEAN MASS. Doel: maximale spieropbouw met zo min mogelijk vettoename. Advies mag meer gericht zijn op maximale hypertrofie; eventueel iets meer volume op achterblijvende spiergroepen als herstel het toelaat. Cardio mag lager (2–3× per week kort). Rustig aankomen in gewicht is de bedoeling.`;
+  return `\n\n${focus}\nCardio laatste 7 dagen: ${cardio.count}× / ${cardio.minutes} min (richtlijn deze fase ±${goal.cardioMinutesPerWeek} min/week).`;
+}
+
 // Deload status, stalled exercises and the weight goal/tempo — the context
 // the coach needs to judge recovery and the pace of the cut.
 function buildPlanStatusContext(days, sessions, bodyLogs) {
   const lines = [];
   const deload = getDeloadState();
-  if (deload.active) lines.push(`Deload-week actief t/m ${new Date(deload.activeUntil).toLocaleDateString("nl-NL")} (halve sets, zelfde gewicht, RIR 3+).`);
+  if (deload.active) lines.push(`Deload-week actief t/m ${new Date(deload.activeUntil).toLocaleDateString("nl-NL")} (±2 werksets per oefening, zelfde gewicht, RIR 3–4).`);
   else if (deload.lastEndedAt) lines.push(`Laatste deload afgerond op ${new Date(deload.lastEndedAt).toLocaleDateString("nl-NL")}.`);
   const stalled = stalledExercises(sessions, days);
   lines.push(stalled.length ? `Oefeningen zonder e1RM-progressie over de laatste 3 trainingen: ${stalled.join(", ")}.` : "Geen oefeningen die 3 trainingen stilstaan.");
@@ -209,6 +228,7 @@ async function buildUserContext() {
     storage.getDailyLogs(),
   ]);
   return (
+    buildPhaseContext(sessions) +
     buildScheduleContext(days) +
     buildFrequencyContext(sessions) +
     buildSessionsContext(sessions) +

@@ -13,6 +13,7 @@ import { recordsBySession, formatRecord } from "./exercise-stats.js";
 import { makeMuscleResolver, sessionMuscleSets } from "./muscles.js";
 import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
 import { getDeloadState, deloadSets, renderDeloadBanner } from "./deload.js";
+import { getTrainingGoal } from "./training-goal.js";
 
 // Every render bumps this; a render that finds it changed after an await has
 // been overtaken (e.g. the day picker changed while it was still loading the
@@ -33,14 +34,34 @@ export async function renderTodayView(container) {
   await renderForDay(container, days, defaultDay.id);
 }
 
+const WEEKDAYS = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
+
+// "Maandag – Rug + Biceps A" → { weekday: "Maandag", title: "Rug + Biceps A" }.
+// Days without a weekday in their name keep the whole name as title.
+export function splitDayName(name) {
+  const m = /^\s*(maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\s*[–—-]\s*(.+)$/i.exec(name || "");
+  return m ? { weekday: m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(), title: m[2].trim() } : { weekday: null, title: name || "" };
+}
+
+export function isRestDay(day) {
+  return Boolean(day.rest) || !(day.exercises || []).length;
+}
+
+// Which day to open: an unfinished workout's day first; otherwise the day
+// named after today's weekday (the schema is a fixed week); otherwise the
+// day after the last one trained, skipping rest days.
 async function pickDefaultDay(days) {
   const draftDay = days.find((d) => d.id === getDraftDayId());
   if (draftDay) return draftDay;
+  const today = WEEKDAYS[new Date().getDay()];
+  const todayDay = days.find((d) => (splitDayName(d.name).weekday || "").toLowerCase() === today);
+  if (todayDay) return todayDay;
+  const training = days.filter((d) => !isRestDay(d));
   const lastSession = await storage.getLastSession();
-  if (!lastSession) return days[0];
-  const lastIndex = days.findIndex((d) => d.id === lastSession.dayId);
-  if (lastIndex === -1) return days[0];
-  return days[(lastIndex + 1) % days.length];
+  if (!training.length) return days[0];
+  if (!lastSession) return training[0];
+  const lastIndex = training.findIndex((d) => d.id === lastSession.dayId);
+  return lastIndex === -1 ? training[0] : training[(lastIndex + 1) % training.length];
 }
 
 // Dashboard strip shown above the day picker: today's date, the selected
@@ -54,22 +75,33 @@ function renderHero(day, totalSets) {
   const text = document.createElement("div");
   text.className = "today-hero-text";
 
-  const date = document.createElement("p");
-  date.className = "today-hero-date";
-  date.textContent = formatHeroDate(new Date());
-  text.appendChild(date);
-
+  // Training day, muscle groups and focus at a glance:
+  // "MAANDAG" / "RUG + BICEPS A" / "Focus: Rugdikte". Today's date only
+  // when it isn't already said by the weekday (training another day's plan).
+  const { weekday, title } = splitDayName(day.name);
+  if (!weekday || weekday.toLowerCase() !== WEEKDAYS[new Date().getDay()]) {
+    const date = document.createElement("p");
+    date.className = "today-hero-date";
+    date.textContent = formatHeroDate(new Date());
+    text.appendChild(date);
+  }
+  if (weekday) {
+    const weekdayEl = document.createElement("p");
+    weekdayEl.className = "today-hero-weekday";
+    weekdayEl.textContent = weekday;
+    text.appendChild(weekdayEl);
+  }
   const dayName = document.createElement("h2");
   dayName.className = "today-hero-day";
-  dayName.textContent = day.name;
+  dayName.textContent = title;
   text.appendChild(dayName);
   const subtitle = document.createElement("p");
   subtitle.className = "hero-subtitle";
-  subtitle.textContent = "Bouw verder aan je kracht.";
+  subtitle.textContent = day.focus ? `Focus: ${day.focus}` : "Bouw verder aan je kracht.";
   text.appendChild(subtitle);
   const stats = document.createElement("p");
   stats.className = "hero-stats";
-  stats.textContent = day.exercises.length + " oefeningen  /  " + totalSets + " sets";
+  stats.textContent = isRestDay(day) ? "Rustdag" : day.exercises.length + " oefeningen  /  " + totalSets + " werksets";
   text.appendChild(stats);
 
   hero.appendChild(text);
@@ -82,7 +114,8 @@ function renderHero(day, totalSets) {
   const progressLabel = document.createElement("span");
   progressLabel.textContent = "SETS VOLTOOID";
   progress.appendChild(progressLabel);
-  hero.appendChild(progress);
+  // No sets to count on a rest day.
+  if (!isRestDay(day)) hero.appendChild(progress);
 
   return { hero, ringSvg };
 }
@@ -163,17 +196,15 @@ async function renderForDay(container, days, selectedDayId) {
   });
   picker.addEventListener("change", () => renderForDay(container, days, picker.value));
   container.appendChild(picker);
+  if (isRestDay(day)) {
+    container.appendChild(renderRestDay(days, day));
+    return;
+  }
+
   const section = document.createElement("div");
   section.className = "workout-section-heading";
   section.innerHTML = '<h3>Je oefeningen</h3><span>Vul je sets in</span>';
   container.appendChild(section);
-
-  if (!day.exercises.length) {
-    const empty = document.createElement("p");
-    empty.textContent = "Deze dag heeft nog geen oefeningen. Voeg ze toe via het Schema-tabblad.";
-    container.appendChild(empty);
-    return;
-  }
 
   const form = document.createElement("form");
   form.className = "today-form";
@@ -460,6 +491,24 @@ async function renderExerciseBlock(exercise, day, index, deload = false) {
   return block;
 }
 
+// A rest day: say so, and what's next, instead of an empty form.
+function renderRestDay(days, day) {
+  const card = document.createElement("div");
+  card.className = "rest-day-card";
+  const title = document.createElement("p");
+  title.className = "rest-day-title";
+  title.textContent = day.rest || /rust/i.test(day.name) ? "Rustdag" : "Nog geen oefeningen";
+  const body = document.createElement("p");
+  body.className = "rest-day-body";
+  const index = days.findIndex((d) => d.id === day.id);
+  const next = [...days.slice(index + 1), ...days.slice(0, index)].find((d) => !isRestDay(d));
+  body.textContent = day.rest || /rust/i.test(day.name)
+    ? `Geen krachttraining gepland — herstel hoort bij het plan.${next ? ` Volgende training: ${next.name}.` : ""} Wil je toch trainen? Kies hierboven een dag.`
+    : "Voeg oefeningen toe via het Schema-tabblad.";
+  card.append(title, body);
+  return card;
+}
+
 function renderDeloadAdvice(exercise, weight) {
   const box = document.createElement("div");
   box.className = "advice-box advice-deload";
@@ -468,7 +517,7 @@ function renderDeloadAdvice(exercise, weight) {
   title.textContent = "Deload-week";
   const main = document.createElement("p");
   main.className = "advice-main";
-  main.textContent = `${exercise.sets} sets${weight != null ? ` · ${weight} kg (zelfde gewicht)` : ""} · stop op RIR 3+`;
+  main.textContent = `${exercise.sets} sets${weight != null ? ` · ${weight} kg (zelfde gewicht)` : ""} · stop op RIR 3–4`;
   const detail = document.createElement("p");
   detail.className = "advice-detail";
   detail.textContent = "Licht houden: deze training telt niet mee voor je progressie-advies.";
@@ -587,7 +636,7 @@ function renderCardioSection(lastCardio) {
   details.className = "cardio-section";
 
   const summary = document.createElement("summary");
-  summary.textContent = "Cardio na training (optioneel)";
+  summary.textContent = `Cardio na training (${getTrainingGoal() === "cut" ? "doel ±15–20 min" : "optioneel"})`;
   details.appendChild(summary);
 
   const grid = document.createElement("div");
@@ -603,7 +652,7 @@ function renderCardioSection(lastCardio) {
     grid.appendChild(label);
     return input;
   };
-  const minutes = field("Minuten", "cardio-minutes", "10");
+  const minutes = field("Minuten", "cardio-minutes", "20");
   const incline = field("Helling %", "cardio-incline", "13");
   const speed = field("km/u", "cardio-speed", "3.5");
   details.appendChild(grid);

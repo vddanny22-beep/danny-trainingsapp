@@ -56,9 +56,11 @@ export function weightRate(points, now = new Date(), days = 28) {
 
 // Pure. Plain-language verdict on the tempo, from the perspective of fat
 // loss unless the goal lies above the current weight.
-export function assessTempo(rate, currentKg, goalKg) {
+// `leanMassPhase`: without a goal weight, the LEAN MASS phase means slow
+// gaining is the intent; with a goal weight, the goal decides.
+export function assessTempo(rate, currentKg, goalKg, leanMassPhase = false) {
   if (!rate) return null;
-  const wantsGain = goalKg != null && goalKg > currentKg;
+  const wantsGain = goalKg != null ? goalKg > currentKg : leanMassPhase;
   const pct = rate.perWeekPct;
   let level;
   let text;

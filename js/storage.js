@@ -228,7 +228,7 @@ export async function setMeta(key, value) {
 // interrupted halfway (phone killed the page) simply runs again next launch.
 // Only "days" and "meta" are touched; sessions, body logs, photos and chat
 // are not even opened by this transaction.
-export async function commitDaysMigration(days, metaEntries) {
+export async function commitDaysMigration(days, metaEntries, deleteDayIds = []) {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(["days", "meta"], "readwrite");
@@ -236,6 +236,7 @@ export async function commitDaysMigration(days, metaEntries) {
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
     const dayStore = transaction.objectStore("days");
+    deleteDayIds.forEach((id) => dayStore.delete(id));
     days.forEach((day) => dayStore.put(day));
     const metaStore = transaction.objectStore("meta");
     Object.entries(metaEntries).forEach(([key, value]) => metaStore.put({ key, value }));

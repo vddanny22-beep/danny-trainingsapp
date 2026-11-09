@@ -60,7 +60,7 @@ it with its own icon, launching full-screen like a real app.
 - `css/style.css` — mobile-first styling
 - `js/storage.js` — IndexedDB wrapper (schema + session log)
 - `js/progression.js` — progressive-overload advice from ALL sets + the RIR of the last set (increase / hold / improve reps / possibly too heavy), with a per-exercise `incrementKg` or the machine's real `weightStack` (the next existing weight on the machine)
-- `js/migrations.js` — versioned one-time schema migrations (`schemaVersion` in the IndexedDB `meta` store); v2 = the hypertrophy plan from `seed.js`, with a snapshot of the old schema that can be restored from the Schema tab
+- `js/migrations.js` — versioned one-time schema migrations (`schemaVersion` in the IndexedDB `meta` store): v2 = the Push/Pull/Legs plan, v3 = the 6-day split. Each keeps existing exercise ids and machine settings, touches only the schema, and snapshots the old schema (restorable from the Schema tab)
 - `js/exercise-stats.js` — pure per-exercise / whole-training stats for Voortgang and the AI Coach
 - `js/formatters.js` — shared display helpers (set lines, cardio)
 - `js/muscles.js` — which muscles each exercise trains (name-based defaults, overridable per exercise in the Schema tab) and hard sets per muscle group (primary 1, secondary ½) against a weekly hypertrophy target
@@ -71,7 +71,8 @@ it with its own icon, launching full-screen like a real app.
 - `js/daily-log.js` — protein and steps per day (Vandaag card, Voortgang averages, targets); stored in the IndexedDB `dailyLogs` store and included in backups
 - `js/samsung-import.js` — imports steps and body weight from a Samsung Health CSV export (Samsung Health → Instellingen → Persoonlijke gegevens downloaden). There is no direct link: Samsung Health / Health Connect are only reachable from a native Android app. The parser is tolerant of column prefixes, shows a preview first, only adds/updates, and re-importing the same export doesn't duplicate anything
 - `js/volume-stats.js` — pure aggregation helpers: weekly training volume, split per movement type, and Epley 1RM estimates
-- `js/seed.js` — the default schema loaded on first run only (fully editable after)
+- `js/seed.js` — the training plans: the current 6-day split (Rug + Biceps A, Borst + Triceps A, Benen, Schouders, Rug + Biceps B, Borst + Triceps B, Zondag rust), loaded on a first run and used by the schema migrations; fully editable in the Schema tab after
+- `js/training-goal.js` — the training phase (CUT / RECOMP or LEAN MASS): steers the cardio target, the weight-tempo verdict and the AI Coach's emphasis; the schema stays the same
 - `js/schema-editor.js` — the Schema tab: add/edit/delete days and exercises via inline forms, plus the Trainings-, Back-up- and Sync-instellingen sections
 - `js/today-view.js` — the Vandaag tab: shows the next workout with last time's sets per exercise, logs a session (with an optional note)
 - `js/app-update.js` — offers a reload when the service worker has a new version waiting
