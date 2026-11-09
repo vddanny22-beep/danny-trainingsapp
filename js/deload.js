@@ -3,7 +3,8 @@
 // week tends to fix that faster than grinding on. The app only SUGGESTS it;
 // nothing changes until the user taps "start".
 //
-// Deload here = volume deload: half the sets, the SAME weight, stop at RIR 3+.
+// Deload here = volume deload: about 2 work sets per exercise, the SAME
+// weight, stop at RIR 3–4.
 // Keeping the weight means no rounding of real machine weights, and strength
 // is kept while fatigue drops. Sessions logged during a deload are marked
 // `deload: true` and are ignored for next-time advice and stagnation checks.
@@ -62,9 +63,10 @@ export function snoozeDeload(now = new Date()) {
   writeState({ ...readState(), snoozedUntil: new Date(now.getTime() + SNOOZE_DAYS * DAY_MS).toISOString() });
 }
 
-// Half the sets, rounded up (4 → 2, 3 → 2).
+// About 2 work sets per exercise (4 → 2, 3 → 2, 2 → 2). The schema itself is
+// never changed: the Vandaag tab shows this number only while a deload runs.
 export function deloadSets(sets) {
-  return Math.max(1, Math.ceil(sets / 2));
+  return Math.max(1, Math.min(2, sets));
 }
 
 // Pure. Exercises (by name, from the current schema) whose estimated 1RM
@@ -133,13 +135,13 @@ export function renderDeloadBanner(sessions, days, onChange) {
   if (state.active) {
     banner.classList.add("active");
     title.textContent = `Deload-week t/m ${formatDay(state.activeUntil)}`;
-    body.textContent = "Helft van de sets, zelfde gewicht, stop elke set met nog 3+ reps over. Deze trainingen tellen niet mee voor je progressie-advies.";
+    body.textContent = "±2 werksets per oefening, zelfde gewicht, stop elke set met nog 3–4 reps over. Doel is herstel: deze trainingen tellen niet mee voor je progressie-advies.";
     button("Deload stoppen", "", () => stopDeload());
   } else {
     const { suggest, stalled } = deloadSuggestion(sessions, days, state);
     if (!suggest) return null;
     title.textContent = "Deload voorgesteld";
-    body.textContent = `${stalled.length} oefeningen staan al 3 trainingen stil (${stalled.join(", ")}). Dat wijst vaak op opgebouwde vermoeidheid. Voorstel: 1 week de helft van de sets, zelfde gewicht, RIR 3+.`;
+    body.textContent = `${stalled.length} oefeningen staan al 3 trainingen stil (${stalled.join(", ")}). Dat wijst vaak op opgebouwde vermoeidheid. Voorstel: 1 week ±2 werksets per oefening, zelfde gewicht, RIR 3–4.`;
     button("Deload-week starten", "btn-accent", () => startDeload());
     button("Niet nu", "", () => snoozeDeload());
   }

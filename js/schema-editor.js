@@ -11,6 +11,7 @@ import { makeDecimalInput, parseDecimal } from "./decimal-input.js";
 import { incrementFor, weightStackOf, parseWeightStack, formatWeightStack } from "./progression.js";
 import { getSchemaSnapshot, restoreSchemaSnapshot } from "./migrations.js";
 import { MUSCLES, musclesFor, defaultMusclesFor } from "./muscles.js";
+import { TRAINING_GOALS, getTrainingGoal, setTrainingGoal } from "./training-goal.js";
 
 // Renders the full schema editor (all days, expandable to their exercises)
 // into `container`. Every mutation re-fetches from storage and re-renders,
@@ -35,10 +36,11 @@ export async function renderSchemaEditor(container) {
     addDayBtn.replaceWith(renderDayNameForm({
       submitLabel: "Toevoegen",
       onCancel: () => renderSchemaEditor(container),
-      onSubmit: async (name) => {
+      onSubmit: async (name, focus) => {
         await storage.saveDay({
           id: crypto.randomUUID(),
           name,
+          focus,
           // One past the highest existing order rather than days.length:
           // deleting a day leaves a gap, and counting would hand the new day
           // an order another day already holds.
@@ -174,6 +176,52 @@ async function renderSnapshotSettings(rootContainer) {
   return section;
 }
 
+// CUT / RECOMP ↔ LEAN MASS. The schema stays the same; the phase steers the
+// cardio target, the weight-tempo verdict and the AI Coach's emphasis.
+function renderTrainingGoalSetting() {
+  const wrap = document.createElement("div");
+  wrap.className = "notification-setting training-goal-setting";
+
+  const label = document.createElement("p");
+  label.className = "inline-form-caption";
+  label.textContent = "Trainingsdoel (fase)";
+  wrap.appendChild(label);
+
+  const toggle = document.createElement("div");
+  toggle.className = "segmented";
+  toggle.setAttribute("role", "group");
+  toggle.setAttribute("aria-label", "Trainingsdoel");
+  const help = document.createElement("p");
+  help.className = "sync-help";
+
+  const paint = () => {
+    const current = getTrainingGoal();
+    toggle.querySelectorAll("button").forEach((b) => {
+      const active = b.dataset.goal === current;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
+    const info = TRAINING_GOALS[current];
+    help.textContent = `${info.summary} Cardio: ${info.cardioHint}`;
+  };
+  Object.entries(TRAINING_GOALS).forEach(([key, info]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.goal = key;
+    btn.textContent = info.label;
+    btn.addEventListener("click", () => {
+      setTrainingGoal(key);
+      paint();
+      showToast(`Trainingsdoel: ${info.label}`);
+    });
+    toggle.appendChild(btn);
+  });
+
+  wrap.append(toggle, help);
+  paint();
+  return wrap;
+}
+
 function renderTrainingSettings() {
   const section = document.createElement("section");
   section.className = "sync-settings";
@@ -211,6 +259,7 @@ function renderTrainingSettings() {
   section.appendChild(picker);
   section.appendChild(status);
   section.appendChild(renderNotificationSetting());
+  section.appendChild(renderTrainingGoalSetting());
   return section;
 }
 
@@ -356,6 +405,12 @@ function renderDayCard(day, rootContainer, days, index) {
 
   const title = document.createElement("h3");
   title.textContent = day.name;
+  if (day.focus) {
+    const focus = document.createElement("span");
+    focus.className = "day-card-focus";
+    focus.textContent = `Focus: ${day.focus}`;
+    title.appendChild(focus);
+  }
   header.appendChild(title);
 
   const actions = document.createElement("div");
@@ -366,10 +421,11 @@ function renderDayCard(day, rootContainer, days, index) {
   const renameBtn = smallButton("Naam wijzigen", () => {
     header.replaceWith(renderDayNameForm({
       value: day.name,
+      focus: day.focus || "",
       submitLabel: "Opslaan",
       onCancel: () => renderSchemaEditor(rootContainer),
-      onSubmit: async (name) => {
-        await storage.saveDay({ ...day, name });
+      onSubmit: async (name, focus) => {
+        await storage.saveDay({ ...day, name, focus });
         renderSchemaEditor(rootContainer);
       },
     }));
@@ -626,8 +682,9 @@ function renderMusclePicker(initial) {
   return api;
 }
 
-// One text field, shared by "add day" and "rename day".
-function renderDayNameForm({ value = "", submitLabel, onSubmit, onCancel }) {
+// Name + optional focus line (shown at the top of the workout), shared by
+// "add day" and "rename day". A day without exercises counts as a rest day.
+function renderDayNameForm({ value = "", focus = "", submitLabel, onSubmit, onCancel }) {
   const form = document.createElement("form");
   form.className = "inline-form";
   // Native constraint validation would otherwise block submit before our own
@@ -635,8 +692,10 @@ function renderDayNameForm({ value = "", submitLabel, onSubmit, onCancel }) {
   // in-form Dutch message the rest of the app uses.
   form.noValidate = true;
 
-  const nameInput = textInput(value, "bijv. Zaterdag – Push");
+  const nameInput = textInput(value, "bijv. Maandag – Rug + Biceps A");
   form.appendChild(formRow("Naam", nameInput));
+  const focusInput = textInput(focus, "bijv. Rugdikte");
+  form.appendChild(formRow("Focus (optioneel)", focusInput));
 
   const error = document.createElement("p");
   error.className = "inline-form-error";
@@ -650,7 +709,7 @@ function renderDayNameForm({ value = "", submitLabel, onSubmit, onCancel }) {
       error.textContent = "Vul een naam in.";
       return;
     }
-    onSubmit(name);
+    onSubmit(name, focusInput.value.trim());
   });
 
   focusOnInsert(nameInput);

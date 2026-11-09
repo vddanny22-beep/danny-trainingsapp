@@ -10,6 +10,7 @@ import { renderBodyMap, renderBodyMapLegend } from "./body-map.js";
 import { renderSamsungImport } from "./samsung-import.js";
 import { showToast } from "./ui-toast.js";
 import { getGoalWeight, setGoalWeight, weightRate, assessTempo, formatKgSigned } from "./body-goal.js";
+import { trainingGoalInfo, cardioSummary } from "./training-goal.js";
 import {
   getTargets, setTargets, latestWeightKg, dailyAverages, dailySeries,
 } from "./daily-log.js";
@@ -126,7 +127,7 @@ function renderGoalBox(rootContainer, logs) {
   const current = points.length ? points[points.length - 1].value : null;
   const goal = getGoalWeight();
   const rate = weightRate(points);
-  const tempo = current != null ? assessTempo(rate, current, goal) : null;
+  const tempo = current != null ? assessTempo(rate, current, goal, trainingGoalInfo().key === "lean-mass") : null;
 
   const lines = [];
   if (goal != null && current != null) {
@@ -238,6 +239,12 @@ function renderTrainingOverview(sessions) {
   grid.appendChild(renderOverviewCard("Laatste 30 dagen", `${o.sessions30}×`, o.cardio30 ? `trainingen · ${o.cardio30}× cardio` : "trainingen"));
   grid.appendChild(renderOverviewCard("Volume 30 dagen", formatKg(o.volume30), `totaal ${formatKg(o.volumeTotal)}`));
   grid.appendChild(renderOverviewCard("Progressie", `${o.progressed}/${o.tracked}`, "oefeningen sterker dan 4 wk geleden"));
+  // Cardio stays out of strength volume and progression; it gets its own
+  // card, measured against the current phase's weekly target.
+  const goal = trainingGoalInfo();
+  const cardio = cardioSummary(sessions);
+  grid.appendChild(renderOverviewCard("Cardio 7 dagen", `${cardio.minutes} min`, `${cardio.count}× · doel ±${goal.cardioMinutesPerWeek} min/week`));
+  grid.appendChild(renderOverviewCard("Fase", goal.label, goal.key === "cut" ? "vet eraf, spier en kracht behouden" : "maximale spieropbouw"));
   wrap.appendChild(grid);
   return wrap;
 }

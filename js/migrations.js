@@ -1,5 +1,5 @@
 import * as storage from "./storage.js";
-import { PLAN } from "./seed.js";
+import { PLAN, PLAN_V3, buildDaysFromPlan } from "./seed.js";
 import { dayCategory } from "./volume-stats.js";
 import { defaultIncrementKg } from "./progression.js";
 
@@ -16,8 +16,9 @@ import { defaultIncrementKg } from "./progression.js";
 // stores aren't even opened. Historical sessions keep their own exerciseName/
 // exerciseId/sets exactly as logged.
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 const SNAPSHOT_KEY = "schemaSnapshotBeforeV2";
+const SNAPSHOT_KEY_V3 = "schemaSnapshotBeforeV3";
 
 // "Chest-Supported Row " and "chest supported row" are the same exercise.
 export function normaliseName(name) {
@@ -82,6 +83,44 @@ export function migrateDaysV1toV2(days) {
   return { days: migrated, removed, added };
 }
 
+// v2 → v3: the 6-day split (Rug + Biceps A, Borst + Triceps A, Benen,
+// Schouders, Rug + Biceps B, Borst + Triceps B, Zondag rust) from seed.js
+// PLAN_V3. Pure, like v1→v2. Returns { days, removed }.
+//  - Exercises the user already has keep their id (first one found by name)
+//    and their own machine settings: step, weight stack, muscles. Their name
+//    is the plan's, which is the same spelling the v2 plan used.
+//  - The same exercise on several days shares one id.
+//  - The legs day keeps its id; the other days are new (their contents
+//    changed completely, and sessions keep their own dayName anyway).
+//  - Anything in the old schema that isn't in the new plan is dropped from
+//    the SCHEMA only (listed in `removed`; history is untouched).
+export function migrateDaysV2toV3(days) {
+  const existing = new Map();
+  (days || []).forEach((day) => (day.exercises || []).forEach((e) => {
+    const key = normaliseName(e.name);
+    if (!existing.has(key)) existing.set(key, e);
+  }));
+  const legsDay = (days || []).find((d) => dayCategory(d.name) === "Legs");
+
+  const planNames = new Set(PLAN_V3.flatMap((d) => d.exercises.map((e) => normaliseName(e.name))));
+  const removed = [...existing.values()].filter((e) => !planNames.has(normaliseName(e.name))).map((e) => e.name);
+
+  const migrated = buildDaysFromPlan(PLAN_V3, {
+    idFor: (name) => existing.get(normaliseName(name))?.id || null,
+    dayIdFor: (name) => (legsDay && /Benen/.test(name) ? legsDay.id : null),
+    extrasFor: (name) => {
+      const old = existing.get(normaliseName(name));
+      if (!old) return {};
+      const extras = {};
+      if (old.incrementKg > 0) extras.incrementKg = old.incrementKg;
+      if (Array.isArray(old.weightStack) && old.weightStack.length) extras.weightStack = old.weightStack;
+      if (old.muscles && (old.muscles.primary?.length || old.muscles.secondary?.length)) extras.muscles = old.muscles;
+      return extras;
+    },
+  });
+  return { days: migrated, removed };
+}
+
 // Runs every pending migration. Returns a short Dutch summary when something
 // changed (for a one-time toast), or null when the schema was already current.
 export async function runMigrations() {
@@ -109,6 +148,25 @@ export async function runMigrations() {
       : null;
   }
 
+  if (version < 3) {
+    // Re-read: the v2 step above may just have rewritten the days.
+    const before = await storage.getDays();
+    const { days, removed } = migrateDaysV2toV3(before);
+    const meta = { schemaVersion: 3, schemaMigratedAt: new Date().toISOString() };
+    if (!(await storage.getMeta(SNAPSHOT_KEY_V3)) && before.length) {
+      meta[SNAPSHOT_KEY_V3] = { savedAt: new Date().toISOString(), days: before };
+    }
+    // replaceDays semantics inside the same transaction: old day records
+    // that the new plan doesn't reuse are deleted from the "days" store
+    // (they live on in the snapshot); nothing else is touched.
+    const keep = new Set(days.map((d) => d.id));
+    await storage.commitDaysMigration(days, meta, before.map((d) => d.id).filter((id) => !keep.has(id)));
+    summary = before.length
+      ? "Nieuw 6-daags schema actief: Rug + Biceps, Borst + Triceps, Benen, Schouders. Je historie blijft volledig bewaard." +
+        (removed.length ? ` Niet meer in het schema: ${removed.join(", ")}.` : "")
+      : null;
+  }
+
   return summary;
 }
 
@@ -116,12 +174,14 @@ export async function markSchemaCurrent() {
   await storage.setMeta("schemaVersion", CURRENT_SCHEMA_VERSION);
 }
 
+// The most recent pre-migration schema: before v3 if that migration ran,
+// else before v2.
 export async function getSchemaSnapshot() {
-  return storage.getMeta(SNAPSHOT_KEY);
+  return (await storage.getMeta(SNAPSHOT_KEY_V3)) || storage.getMeta(SNAPSHOT_KEY);
 }
 
-// Puts the pre-migration schema back (sessions untouched). Version stays 2,
-// so the migration doesn't immediately overwrite it again on the next launch.
+// Puts the pre-migration schema back (sessions untouched). The version stays
+// current, so the migration doesn't immediately overwrite it on next launch.
 export async function restoreSchemaSnapshot() {
   const snapshot = await getSchemaSnapshot();
   if (!snapshot?.days?.length) return false;

@@ -77,6 +77,7 @@ export function volumeByWeek(sessions, weekCount = 12, now = new Date()) {
 export function dayCategory(dayName) {
   const name = dayName || "";
   if (/legs?|benen|onderlichaam/i.test(name)) return "Legs";
+  if (/schouder|shoulder/i.test(name)) return "Schouders";
   if (/pull|rug|trek/i.test(name)) return "Pull";
   if (/push|borst|duw/i.test(name)) return "Push";
   return "Overig";
